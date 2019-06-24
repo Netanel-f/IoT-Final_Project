@@ -1,0 +1,35 @@
+/* TODO:
+// 1.   Init device
+// 2.   Init GPS & modem
+// 3.   Apply GUI:
+// 3.1      Welcome screens
+// 3.1.1        BTN1: RUN TEST
+// 3.1.2        BTN0: CANCEL TEST
+// 4.   Test iteration
+// 4.1      Get all available operators
+// 4.2      connect to one operator at a time - CREG (BUT ONLY PARTNER/CELLCOM/PELEPHONE)
+// 4.2.1        measure latency using ping - AT^SISX="Ping" example on pages 274-275
+// 4.2.2        Create Internet profile and connect it
+// 4.2.3        Set up TCP SOCKET connection - example page 260
+// 4.2.4        Open socket
+// 4.2.5        UL bitrate: send data via TCP - 10.15.6/7 + times
+// 4.2.6        DL bitrate: receive data via TCP - 10.15.6/7 + times
+// 4.2.7        latency?
+// 4.2.8        Close socket
+// 5    Display results on screen
+// 5.1      Press any button to welcome screen
+
+
+*/
+
+// Notes:
+// PING:
+// -----
+// In case of <pingInfoType>= 1: ICMP Echo Requests (1 - 30 rows)
+//^SISX:"Ping", <pingInfoType>, <conProfileId>, <ip-address>, <roundTripTime>
+//In case of <pingInfoType>= 2: Packet statistic (1 row)
+//^SISX:"Ping", <pingInfoType>, <conProfileId>, <sent>, <received>, <lost>, <lostPercent>
+//In case of <pingInfoType>= 3: Time statistic (1 row)
+//^SISX:"Ping", <pingInfoType>, <conProfileId>, <minRTT>, <maxRTT>, <meanRTT>
+
+// todo maybe distance from antenna?
