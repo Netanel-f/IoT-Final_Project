@@ -186,6 +186,15 @@ bool inetServiceClose();
 
 
 /**
+ * This method will make a ping to given address and will return the mean rtt it took
+ * @param ip_address the host to ping to
+ * @param mean_rtt int pointer to save the result
+ * @return true iff ping succeeded and mean_rtt stored, false otherwise
+ */
+bool CellularPing(char * ip_address, int * mean_rtt);
+
+
+/**
  * @brief Delays number of msTick Systicks (typically 1 ms)
  * @param dlyTicks Number of ticks to delay
  */

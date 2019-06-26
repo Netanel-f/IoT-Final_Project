@@ -55,6 +55,7 @@ unsigned char AT_CMD_SISW_WRITE_PRFX[] = "AT^SISW=";
 unsigned char AT_CMD_SISC_WRITE_PRFX[] = "AT^SISC=";
 unsigned char AT_CMD_SISE_WRITE_PRFX[] = "AT^SISE=";
 unsigned char AT_CMD_CCID_READ[] = "AT+CCID?";
+unsigned char AT_CMD_SISX_WRITE_PRFX[] = "AT^SISX=";
 unsigned char AT_CMD_SHUTDOWN[] = "AT^SMSO\r\n";
 
 // AT RESPONDS
@@ -606,7 +607,7 @@ int splitCopsResponseToOpsTokens(unsigned char *cops_response, OPERATOR_INFO *op
 
     int parsed_ops_index = 0;
     for (; op_index > 0; op_index--) {
-        if (splitOpTokensToOPINFO(operators_tokens[parsed_ops_index], &opList[parsed_ops_index]), specific_operators) {
+        if (splitOpTokensToOPINFO(operators_tokens[parsed_ops_index], &opList[parsed_ops_index], specific_operators)) {
             parsed_ops_index++;
         }
 
@@ -881,11 +882,47 @@ int CellularGetPayload(OPERATOR_INFO *opList, int candidate_op_idx, char * iccid
 int CellularGetAcT(OPERATOR_INFO * operator) {
 	if (strcmp(operator->accessTechnology, "2G") == 0) {
 		return 0;
-	} else if (strcmp(operator->accessTechnology, "2G") == 0) {
+
+	} else if (strcmp(operator->accessTechnology, "3G") == 0) {
 		return 2;
+
 	} else {
 		return -1;
 	}
+}
+
+
+/**
+ * This method will make a ping to given address and will return the mean rtt it took
+ * @param ip_address the host to ping to
+ * @param mean_rtt int pointer to save the result
+ * @return true iff ping succeeded and mean_rtt stored, false otherwise
+ */
+bool CellularPing(char * ip_address, int * mean_rtt) {
+    // AT^SISX=<service>, <conProfileId>, <address>[, <request>[, <timelimit>]]
+    // <service> = "Ping"
+    int num_packets = 30; // 1-30
+    int max_responses = num_packets + 5;
+    unsigned int packet_timeout_ms = 1000;
+    int cmd_size = sprintf(command_to_send_buffer, "%sPing, %d, %s, %d, %d", AT_CMD_SISX_WRITE_PRFX, conProfileId, ip_address, num_packets, packet_timeout_ms);
+    sendATcommand(command_to_send_buffer, cmd_size);
+
+    unsigned char * tokens_array[40] = {};
+    if (!waitForATresponse(tokens_array, AT_RES_OK, sizeof(AT_RES_OK) - 1, 40, GENERAL_RECV_TIMEOUT_MS+(num_packets*packet_timeout_ms))) {
+        // error
+        return false;
+    }
+    // response OK
+    for (int idx = 39; idx >= 0; idx--) {
+        if (strncmp(tokens_array[idx], "^SISX: \"Ping\", 3", strlen("^SISX: \"Ping\", 3")) == 0) {
+            // ^SISX:"Ping", 3, <conProfileId>, <minRTT>, <maxRTT>, <meanRTT>
+            char * mean_rtt_res = (tokens_array[idx], ',');
+            *mean_rtt = atoi(mean_rtt_res);
+            return true;
+        }
+    }
+    return false;
+
 }
 
 
