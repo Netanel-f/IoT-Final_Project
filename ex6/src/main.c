@@ -444,6 +444,9 @@ void testSpeed();
 int getOperatorPayload(OPERATOR_INFO * current_op, float ul, float dl, int latency ) {
 	memset(payload_buffer, '\0', MAX_PAYLOAD_SIZE);
 
+	/* get ICCID */
+	CellularGetICCID(iccid);
+
 	//latitude= 31.7498445,longitude= 35.1838178,altitude=10,hdop=2,valid_fix=1,num_sats=4 1557086230000000000
 	float lat_deg = (current_location->latitude) / 10000000.0;
 	float long_deg = (current_location->longitude) / 10000000.0;
@@ -461,8 +464,7 @@ void transmitResult() {
 		return;
 	}
 
-	/* get ICCID */
-	CellularGetICCID(iccid);
+
 
 	printf("Preparing to send GPS payload...");
 	// transmit GPS data over HTTP
