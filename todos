@@ -33,3 +33,5 @@
 //^SISX:"Ping", <pingInfoType>, <conProfileId>, <minRTT>, <maxRTT>, <meanRTT>
 
 // todo maybe distance from antenna?
+
+//todo MAX TCP SIZE 1500bytes
