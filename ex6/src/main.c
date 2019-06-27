@@ -22,6 +22,10 @@
  * 								DECLARATIONS
 *****************************************************************************/
 void Delay(uint32_t dlyTicks);
+int getPreTestData();
+void testSpeed(long double * ul_Bps, long double * dl_Bps);
+void transmitResult(int payload_len);
+int getOperatorPayload(OPERATOR_INFO * current_op, float ul, float dl, int latency );
 //void infoOnDemand(GPS_LOCATION_INFO* last_location);
 //bool speedLimitInternet();
 //void speedLimitInterval(GPS_LOCATION_INFO* last_location, GPS_LOCATION_INFO* old_location);
@@ -32,6 +36,8 @@ void Delay(uint32_t dlyTicks);
 #define MAX_IL_CELL_OPS 10
 #define MIN_GPS_MSGS_TO_FIXTIME 3
 
+#define SPEEDTEST_SERVER_ADDR "95.179.243.207:54321"
+#define SPEEDTEST_PING_ADDR "95.179.243.207"
 #define TRANSMIT_URL "http://51.143.141.28:8086/write?db=mydb"
 #define ONE_MINUTE_IN_MS 60000
 #define FIVE_SECS_IN_MS 5000
@@ -340,9 +346,13 @@ void testOperators() {
 					printf("Current signal quality: %ddBm\n", signal_quality);
 					found_operators[op_index].csq = signal_quality;
 
-
-					//todo test speed!
-					// transmit it
+                    long double ul_Bps, dl_Bps, latency;
+                    int mean_rtt;
+                    testSpeed(&ul_Bps, &dl_Bps);
+                    CellularPing(SPEEDTEST_PING_ADDR, &mean_rtt);
+                    latency = mean_rtt / 2.0;
+					int payload_len = getOperatorPayload(found_operators[op_index], ul_Bps, dl_Bps, latency);
+					transmitResult(payload_len);
 
 				} else {
 					printf("Couldn't get signal quality.\n");
@@ -439,7 +449,66 @@ void testOperators() {
 //	Delay(3000);
 }
 
-void testSpeed();
+void testSpeed(long double * ul_Bps, long double * dl_Bps) {
+    int scnt = 0;
+    int rcnt = 0;
+    uint32_t ul_start, ul_end, dl_start, dl_end;
+
+    // send 1000 packets of 1500 bytes. and wait for server response.
+
+    /* we registered to operator, setup Internet connection */
+    if (!CellularSetupInternetConnectionProfile(20)) {
+        printf("Failed to setup Internet connection");
+        return;
+    }
+    /* Setup TCP socket service profile */
+    if (!socketServiceSetupProfile(SPEEDTEST_SERVER_ADDR)) {
+        printf("Failed to setup TCP Socket service");
+        return;
+    }
+    /* Open socket service profile */
+    if (!serviceProfileOpen(SOCKET_SRV_PROFILE_ID)) {
+        printf("Failed to open Socket service");
+        return;
+    }
+
+    // handle ^SISW: 9,1
+    if (handleSISWURC() != 1) {
+        printf("handle ^SISW failed");
+        return;
+    }
+
+    ul_start = msTicks;
+    while (scnt < ANALYZER_TOTAL_PACKETS) {
+        sendSpeedPacket();
+        scnt++;
+    }
+    // handle ^SISR: 9,1 - wait for ack packet
+    int temp_result = handleSISRURC();
+    ul_end = msTicks;
+
+    if (temp_result != 1) {
+        printf("handle ^SISR failed");
+        return;
+    }
+    waitForULAck();
+
+    dl_start = msTicks;
+    while (rcnt < ANALYZER_TOTAL_PACKETS) {
+        receiveSpeedPacket();
+        rcnt++;
+    }
+    dl_end = msTicks;
+
+    *ul_Bps = ANALYZER_TOTAL_PACKETS * ANALYZER_PACKET_SIZE / ((ul_end - ul_start)*1000000);
+    *dl_Bps = ANALYZER_TOTAL_PACKETS * ANALYZER_PACKET_SIZE / ((dl_end - dl_start)*1000000);
+
+    /* Close socket service profile */
+    if (!serviceProfileClose(SOCKET_SRV_PROFILE_ID)) {
+        printf("Failed to close Socket service");
+        return;
+    }
+}
 
 int getOperatorPayload(OPERATOR_INFO * current_op, float ul, float dl, int latency ) {
 	memset(payload_buffer, '\0', MAX_PAYLOAD_SIZE);
@@ -457,27 +526,14 @@ int getOperatorPayload(OPERATOR_INFO * current_op, float ul, float dl, int laten
 	return payload_len;
 }
 
-void transmitResult() {
-	/* we registered to operator, setup Internet connection */
-	if (!CellularSetupInternetConnectionProfile(20)) {
-		printf("Failed to setup Internet connection");
-		return;
+void transmitResult(int payload_len) {
+	// transmit GPS data over HTTP
+    if (CellularSendHTTPPOSTRequest(TRANSMIT_URL, payload_buffer, payload_len, transmit_response, TRANS_RES_BUF_SIZE) == -1) {
+        printf("Failed\n");
 	}
 
-
-
-	printf("Preparing to send GPS payload...");
-	// transmit GPS data over HTTP
-	//getOperatorPayload
-//	int gps_payload_len = GPSGetPayload(current_location, iccid, unix_time, payload_buffer, MAX_PAYLOAD_SIZE);
-
-//	if (CellularSendHTTPPOSTRequest(TRANSMIT_URL, payload_buffer, gps_payload_len, transmit_response, TRANS_RES_BUF_SIZE) == -1) {
-//		printf("Failed\n");
-//		continue;
-//	}
-
-	// check the service is closed
-	while (!inetServiceClose(HTTP_POST_srvProfileId));
+    // check the service is closed
+	while (!serviceProfileClose(HTTP_SRV_PROFILE_ID));
 
 	return;
 }

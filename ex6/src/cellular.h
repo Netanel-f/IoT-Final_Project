@@ -27,7 +27,6 @@ typedef struct __OPERATOR_INFO {
 } OPERATOR_INFO;
 
 #define MODEM_BAUD_RATE 115200
-#define HTTP_POST_srvProfileId 6
 #define WAIT_BETWEEN_CMDS_MS 100
 #define ICCID_BUFFER_SIZE 23
 #define CELL_PAYLOAD_FORMAT "cellular,name=NetanelFayoumi_SapirElyovitch,ICCID=%s %s %s000000000"
@@ -38,6 +37,15 @@ typedef struct __OPERATOR_INFO {
 #define PELEPHONE_MCC_MNC 42503
 #define MAX_CANDIDATE_CELL_OPS 3
 #define iNA_MAX_CANDIDATE_CELL_OPS 6
+
+// Internet service profile identifier.0..9
+// The <srvProfileId> is used to reference all parameters related to the same service profile. Furthermore,
+// when using the AT commands AT^SISO, AT^SISR, AT^SISW, AT^SIST, AT^SISH and AT^SISC the
+//<srvProfileId> is needed to select a specific service profile.
+#define HTTP_SRV_PROFILE_ID 6
+#define SOCKET_SRV_PROFILE_ID 9
+#define ANALYZER_TOTAL_PACKETS 1000
+#define ANALYZER_PACKET_SIZE 1500
 
 /**************************************************************************//**
  * 							GLOBAL VARIABLES
@@ -177,12 +185,18 @@ int CellularGetPayload(OPERATOR_INFO *opList, int candidate_op_idx, char * iccid
  */
 int CellularGetAcT(OPERATOR_INFO * operator);
 
+/**
+ * This method will open Internet service of given srvProfileId
+ * @param serviceID
+ * @return True if succeeded to open the service, false otherwise.
+ */
+bool serviceProfileOpen(int serviceID);
 
 /**
  * This method will close Internet service of given srvProfileId
  * @return True if succeeded to close the service, false otherwise.
  */
-bool inetServiceClose();
+bool serviceProfileClose(int serviceID);
 
 
 /**
@@ -193,6 +207,23 @@ bool inetServiceClose();
  */
 bool CellularPing(char * ip_address, int * mean_rtt);
 
+
+/**
+ * This method will setup socket service profile
+ * @return true iff setup succeeded
+ */
+bool socketServiceSetupProfile();
+
+//todo
+int handleSISWURC();
+//todo
+int handleSISRURC();
+//todo
+void sendSpeedPacket();
+//todo
+void waitForULAck();
+//todo
+void receiveSpeedPacket();
 
 /**
  * @brief Delays number of msTick Systicks (typically 1 ms)

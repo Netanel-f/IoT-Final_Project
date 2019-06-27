@@ -16,7 +16,8 @@ int getSISURCs(unsigned char ** token_array, int max_urcs, unsigned int timeout_
 /*****************************************************************************
  * 								DEFS
 *****************************************************************************/
-#define MAX_INCOMING_BUF_SIZE 1000
+//#define MAX_INCOMING_BUF_SIZE 1000//todo
+#define MAX_INCOMING_BUF_SIZE 1600
 #define MAX_OP_TOKEN_SIZE 50
 #define MAX_AT_CMD_LEN 100
 #define GENERAL_RECV_TIMEOUT_MS 10000
@@ -32,12 +33,14 @@ int getSISURCs(unsigned char ** token_array, int max_urcs, unsigned int timeout_
 
 #define RESPONSE_TOKENS_SIZE 10
 
+#define SAMPLE_PACKET "iNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKETiNetworkAnalyzer_SAMPLE_PACKET"
 
 /*****************************************************************************
  * 							GLOBAL VARIABLES
 *****************************************************************************/
 static bool CELLULAR_INITIALIZED = false;
 unsigned char command_to_send_buffer[MAX_INCOMING_BUF_SIZE] = "";
+unsigned char speed_packet[] = SAMPLE_PACKET;
 
 unsigned char AT_CMD_SUFFIX[] = "\r\n";
 // AT_COMMANDS
@@ -71,12 +74,6 @@ unsigned char AT_URC_SHUTDOWN[] = "^SHUTDOWN";
 // and, when a service profile is created with AT^SISS the <conProfileId>
 // needs to be set as "conId" value of the AT^SISS parameter <srvParmTag>.
 int conProfileId = -1;
-
-// Internet service profile identifier.0..9
-// The <srvProfileId> is used to reference all parameters related to the same service profile. Furthermore,
-// when using the AT commands AT^SISO, AT^SISR, AT^SISW, AT^SIST, AT^SISH and AT^SISC the
-//<srvProfileId> is needed to select a specific service profile.
-int srvProfileId = HTTP_POST_srvProfileId;
 
 
 /**
@@ -442,7 +439,6 @@ bool parseSISresponse(char * sis_result, int * urcCause, int * urcInfoId) {
     return true;
 }
 
-
 /**
  * parse "^SISR: " urc or "^SISW: " urc suffixes
  * @param sisrw_result "^SISR: " urc or "^SISW: " urc suffixes
@@ -487,26 +483,33 @@ bool parseSISURCs(unsigned char ** token_array, int received_urcs, char * urc_re
 }
 
 
+/**
+ * This method will setup an Http service profile
+ * @param URL dest url to post/get requests to/from
+ * @param payload the request payload
+ * @param payload_len
+ * @return true iff setup suceeded
+ */
 bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
     // AT^SISS=<srvProfileId>, <srvParmTag>, <srvParmValue>
 
     // AT^SISS=6,"SrvType","Http"
     int cmd_size = sprintf(command_to_send_buffer, "%s%d,\"SrvType\",\"Http\"%s",
-                           AT_CMD_SISS_WRITE_PRFX, srvProfileId, AT_CMD_SUFFIX);
+                           AT_CMD_SISS_WRITE_PRFX, HTTP_SRV_PROFILE_ID, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForOK()) { return false; }
 
     // AT^SISS=6,"conId","<conProfileId>"
     cmd_size = sprintf(command_to_send_buffer, "%s%d,\"conId\",\"%d\"%s",
-                       AT_CMD_SISS_WRITE_PRFX, srvProfileId, conProfileId, AT_CMD_SUFFIX);
+                       AT_CMD_SISS_WRITE_PRFX, HTTP_SRV_PROFILE_ID, conProfileId, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForOK()) { return false; }
 
     // AT^SISS=6,"address","<url>"
     cmd_size = sprintf(command_to_send_buffer, "%s%d,\"address\",\"%s\"%s",
-                       AT_CMD_SISS_WRITE_PRFX, srvProfileId, URL, AT_CMD_SUFFIX);
+                       AT_CMD_SISS_WRITE_PRFX, HTTP_SRV_PROFILE_ID, URL, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForOK()) { return false; }
@@ -514,7 +517,7 @@ bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
 
     // AT^SISS=6,"cmd","1"
     cmd_size = sprintf(command_to_send_buffer, "%s%d,\"cmd\",\"%d\"%s",
-                       AT_CMD_SISS_WRITE_PRFX, srvProfileId, SISS_CMD_HTTP_POST, AT_CMD_SUFFIX);
+                       AT_CMD_SISS_WRITE_PRFX, HTTP_SRV_PROFILE_ID, SISS_CMD_HTTP_POST, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForOK()) { return false; }
@@ -524,7 +527,7 @@ bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
     // If "hcContLen" = 0 then the data given in the "hcContent" string will be posted
     // without AT^SISW required.
     cmd_size = sprintf(command_to_send_buffer, "%s%d,\"hcContLen\",\"%d\"%s",
-                       AT_CMD_SISS_WRITE_PRFX, srvProfileId, 0, AT_CMD_SUFFIX);
+                       AT_CMD_SISS_WRITE_PRFX, HTTP_SRV_PROFILE_ID, 0, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForOK()) { return false; }
@@ -532,16 +535,20 @@ bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
 
     //AT^SISS=6,"hcContent","HelloWorld!"
     cmd_size = sprintf(command_to_send_buffer, "%s%d,\"hcContent\",\"%s\"%s",
-                       AT_CMD_SISS_WRITE_PRFX, srvProfileId, payload, AT_CMD_SUFFIX);
+                       AT_CMD_SISS_WRITE_PRFX, HTTP_SRV_PROFILE_ID, payload, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
    sendATcommand(command_to_send_buffer, cmd_size);
    return waitForOK();
 }
 
-
-bool inetServiceOpen() {
-    //AT^SISO=6
-    int cmd_size = sprintf(command_to_send_buffer, "%s%d%s", AT_CMD_SISO_WRITE_PRFX, srvProfileId, AT_CMD_SUFFIX);
+/**
+ * This method will open Internet service of given srvProfileId
+ * @param serviceID
+ * @return True if succeeded to open the service, false otherwise.
+ */
+bool serviceProfileOpen(int serviceID) {
+    //AT^SISO=<serviceID>
+    int cmd_size = sprintf(command_to_send_buffer, "%s%d%s", AT_CMD_SISO_WRITE_PRFX, serviceID, AT_CMD_SUFFIX);
     sendATcommand(command_to_send_buffer, cmd_size);
     bool result = waitForOK();
     return result;
@@ -550,12 +557,12 @@ bool inetServiceOpen() {
 
 /**
  * This method will close Internet service of given srvProfileId
- * @param srvProfileId
+ * @param serviceID
  * @return True if succeeded to close the service, false otherwise.
  */
-bool inetServiceClose() {
-    //AT^SISC=6
-    int cmd_size = sprintf(command_to_send_buffer, "%s%d%s", AT_CMD_SISC_WRITE_PRFX, srvProfileId, AT_CMD_SUFFIX);
+bool serviceProfileClose(int serviceID) {
+    //AT^SISC=<serviceID>
+    int cmd_size = sprintf(command_to_send_buffer, "%s%d%s", AT_CMD_SISC_WRITE_PRFX, serviceID, AT_CMD_SUFFIX);
     sendATcommand(command_to_send_buffer, cmd_size);
 
     bool result = waitForOK();
@@ -729,7 +736,7 @@ int CellularSendHTTPPOSTRequest(char *URL, char *payload, int payload_len, char 
         return -1;
     }
 
-    if (!inetServiceOpen()) {
+    if (!serviceProfileOpen(HTTP_SRV_PROFILE_ID)) {
         return -1;
     }
 
@@ -743,7 +750,7 @@ int CellularSendHTTPPOSTRequest(char *URL, char *payload, int payload_len, char 
 		return -1;
 	}
 
-    if (!inetServiceClose()) {
+    if (!serviceProfileClose(HTTP_SRV_PROFILE_ID)) {
         return -1;
     }
 
@@ -763,7 +770,7 @@ int CellularGetLastError(char *errmsg, int errmsg_max_len) {
 
     // AT^SISE=<srvProfileId>
     int cmd_size = sprintf(command_to_send_buffer, "%s%d%s",
-                           AT_CMD_SISE_WRITE_PRFX, srvProfileId, AT_CMD_SUFFIX);
+                           AT_CMD_SISE_WRITE_PRFX, HTTP_SRV_PROFILE_ID, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
 
@@ -925,7 +932,164 @@ bool CellularPing(char * ip_address, int * mean_rtt) {
 
 }
 
+/**
+ * This method will setup an TCP Socket service profile to pre defined
+ * @param remote_addr the ip address and port of destination
+ * @return true iff setup succeeded
+ */
+bool socketServiceSetupProfile(char * remote_addr) {
+    // AT^SISS=<srvProfileId>, <srvParmTag>, <srvParmValue>
 
+    // AT^SISS=9,"SrvType","Socket"
+    int cmd_size = sprintf(command_to_send_buffer, "%s%d,\"SrvType\",\"Socket\"%s",
+                           AT_CMD_SISS_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, AT_CMD_SUFFIX);
+    // send command and check response OK/ERROR
+    sendATcommand(command_to_send_buffer, cmd_size);
+    if (!waitForOK()) { return false; }
+
+    // AT^SISS=9,"conId","<conProfileId>"
+    cmd_size = sprintf(command_to_send_buffer, "%s%d,\"conId\",\"%d\"%s",
+                       AT_CMD_SISS_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, conProfileId, AT_CMD_SUFFIX);
+    // send command and check response OK/ERROR
+    sendATcommand(command_to_send_buffer, cmd_size);
+    if (!waitForOK()) { return false; }
+
+    // AT^SISS=9,"address","socktcp://95.179.243.207:54321"
+    cmd_size = sprintf(command_to_send_buffer, "%s%d,\"address\",\"socktcp://%s\"%s",
+                       AT_CMD_SISS_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, remote_addr, AT_CMD_SUFFIX);
+    // send command and check response OK/ERROR
+    sendATcommand(command_to_send_buffer, cmd_size);
+    return waitForOK();
+}
+
+//todo
+int handleSISWURC() {
+    unsigned char * tokens_array[1] = {};
+    int received_urcs = getSISURCs(tokens_array, 1, SIS_RECV_TIMEOUT_MS);
+
+    if (received_urcs != 1) {
+        return -1;
+    } else if (strcmp(tokens_array[0], "^SISW: 9,1") == 0) {
+        return 1;
+
+    } else if (strcmp(tokens_array[0], "^SISW: 9,2") == 0) {
+        return 2;
+
+    } else {
+        return -1;
+    }
+}
+
+//todo
+int handleSISWresponse() {
+    unsigned char * tokens_array[1] = {};
+    int received_urcs = getSISURCs(tokens_array, 1, SIS_RECV_TIMEOUT_MS);
+
+    // ^SISW: <srvProfileId>, <cnfWriteLength>, <unackData>
+    if (received_urcs != 1) {
+        return -1;
+
+    } else {
+        char * last_delim = strrchr(&(tokens_array[0][9]), ',');
+        *last_delim = '\0';
+        return atoi(&(tokens_array[0][9]));
+    }
+}
+
+int handleSISRURC() {
+    unsigned char * tokens_array[1] = {};
+    int received_urcs = getSISURCs(tokens_array, 1, SIS_RECV_TIMEOUT_MS);
+
+    if (received_urcs != 1) {
+        return -1;
+    } else if (strcmp(tokens_array[0], "^SISR: 9,1") == 0) {
+        return 1;
+
+    } else if (strcmp(tokens_array[0], "^SISR: 9,2") == 0) {
+        return 2;
+
+    } else {
+        return -1;
+    }
+}
+
+//todo
+int handleSISRresponse() {
+    unsigned char * tokens_array[5] = {};
+    int received_urcs = getSISURCs(tokens_array, 3, SIS_RECV_TIMEOUT_MS);
+
+    // ^SISR: <srvProfileId>, <cnfReadLength>
+    if (received_urcs != 3) {
+        return -1;
+
+    } else {
+        if (!(strcmp(tokens_array[2], "OK") == 0)) {
+            return -1;
+        }
+        return atoi(&(tokens_array[0][9]));
+    }
+}
+
+//todo speed_packet
+void sendSpeedPacket() {
+    int cnfWriteLength;
+    int sent = 0;
+    while (sent < ANALYZER_PACKET_SIZE) {
+        // AT^SISW=<srvProfileId>, <reqWriteLength>
+        int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d\"%s",
+                               AT_CMD_SISW_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, ANALYZER_PACKET_SIZE-sent, AT_CMD_SUFFIX);
+        // send command
+        sendATcommand(command_to_send_buffer, cmd_size);
+        // ^SISW: <srvProfileId>, <cnfWriteLength>, <unackData>
+        cnfWriteLength = handleSISWresponse();
+        if (cnfWriteLength <= 0) {
+            continue;
+        }
+
+        //Number of data bytes as specified by <cnfWriteLength>.
+        while(!SerialSendCellular(&speed_packet[sent], cnfWriteLength));
+        while(!SerialSendCellular(AT_CMD_SUFFIX, 2));
+
+        //OK or ERROR
+        if (waitForOK()) {
+            sent = sent + cnfWriteLength;
+            while(handleSISWURC() == -1);
+        }
+    }
+}
+//todo
+void waitForULAck() {
+    // AT^SISR=<srvProfileId>, <reqWriteLength>
+    int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d\"%s",
+                           AT_CMD_SISR_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, ANALYZER_PACKET_SIZE-recv, AT_CMD_SUFFIX);
+    // send command
+    sendATcommand(command_to_send_buffer, cmd_size);
+    //^SISR: <srvProfileId>, <cnfReadLength>
+    //Number of data bytes as specified by <cnfWriteLength>.
+    //OK or ERROR
+    handleSISRresponse();
+}
+//todo speed_packet
+void receiveSpeedPacket() {
+    int cnfWriteLength;
+    int recv = 0;
+    while (recv < ANALYZER_PACKET_SIZE) {
+        // AT^SISR=<srvProfileId>, <reqWriteLength>
+        int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d\"%s",
+                               AT_CMD_SISR_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, ANALYZER_PACKET_SIZE-recv, AT_CMD_SUFFIX);
+        // send command
+        sendATcommand(command_to_send_buffer, cmd_size);
+        //^SISR: <srvProfileId>, <cnfReadLength>
+        //Number of data bytes as specified by <cnfWriteLength>.
+        //OK or ERROR
+        cnfWriteLength = handleSISRresponse();
+        if (cnfWriteLength <= 0) {
+            continue;
+        }
+        recv = recv + cnfWriteLength;
+        while(handleSISRURC() == -1);
+    }
+}
 /**
  * @brief Delays number of msTick Systicks (typically 1 ms)
  * @param dlyTicks Number of ticks to delay
