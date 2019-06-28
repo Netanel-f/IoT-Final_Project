@@ -141,7 +141,11 @@ void Server::selectPhase() {
 
 }
 
-//todo
+/**
+ * This method will perform the download test by sending the client 1000 packets.
+ * After finishing, will close the connection and kill server.
+ * @param client_fd client file descriptor
+ */
 void Server::downloadTest(int client_fd) {
     int ret_value = 0;
     strcpy(this->read_buffer, speed_str.c_str());
@@ -169,7 +173,11 @@ void Server::downloadTest(int client_fd) {
     }
 }
 
-//todo
+/**
+ * This method will consume an client packet.
+ * When 1000 packets received, will initiate download test.
+ * @param client_fd client file descriptor
+ */
 void Server::uploadTest(int client_fd) {
     ssize_t ret_value = recv(client_fd, this->read_buffer, (size_t) MAX_PACKET_SIZE_BYTES, 0);
     if (ret_value < 0) { print_error("recv() failed", errno); }
