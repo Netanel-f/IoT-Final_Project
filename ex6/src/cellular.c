@@ -932,6 +932,7 @@ bool CellularPing(char * ip_address, int * mean_rtt) {
 
 }
 
+
 /**
  * This method will setup an TCP Socket service profile to pre defined
  * @param remote_addr the ip address and port of destination
@@ -962,7 +963,11 @@ bool socketServiceSetupProfile(char * remote_addr) {
     return waitForOK();
 }
 
-//todo
+
+/**
+ * This method will check for ^SISW: URC
+ * @return <urcCauseId>
+ */
 int handleSISWURC() {
     unsigned char * tokens_array[1] = {};
     int received_urcs = getSISURCs(tokens_array, 1, SIS_RECV_TIMEOUT_MS);
@@ -980,7 +985,11 @@ int handleSISWURC() {
     }
 }
 
-//todo
+
+/**
+ * This method will handle the response comes after AT^SISW command
+ * @return <cnfWriteLength>
+ */
 int handleSISWresponse() {
     unsigned char * tokens_array[1] = {};
     int received_urcs = getSISURCs(tokens_array, 1, SIS_RECV_TIMEOUT_MS);
@@ -996,6 +1005,11 @@ int handleSISWresponse() {
     }
 }
 
+
+/**
+ * This method will check for ^SISR: URC
+ * @return <urcCauseId>
+ */
 int handleSISRURC() {
     unsigned char * tokens_array[1] = {};
     int received_urcs = getSISURCs(tokens_array, 1, SIS_RECV_TIMEOUT_MS);
@@ -1013,7 +1027,11 @@ int handleSISRURC() {
     }
 }
 
-//todo
+
+/**
+ * This method will handle the response comes after AT^SISR command
+ * @return <cnfReadLength>
+ */
 int handleSISRresponse() {
     unsigned char * tokens_array[5] = {};
     int received_urcs = getSISURCs(tokens_array, 3, SIS_RECV_TIMEOUT_MS);
@@ -1030,7 +1048,10 @@ int handleSISRresponse() {
     }
 }
 
-//todo speed_packet
+
+/**
+ * This method will send #ANALYZER_PACKET_SIZE Bytes over the TCP socket.
+ */
 void sendSpeedPacket() {
     int cnfWriteLength;
     int sent = 0;
@@ -1057,11 +1078,15 @@ void sendSpeedPacket() {
         }
     }
 }
-//todo
+
+
+/**
+ * This method consume the pre defined server special upload ack for the entire upload test.
+ */
 void waitForULAck() {
-    // AT^SISR=<srvProfileId>, <reqWriteLength>
+    // AT^SISR=<srvProfileId>, <reqReadLength>//todo check reqReadLength
     int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d\"%s",
-                           AT_CMD_SISR_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, ANALYZER_PACKET_SIZE-recv, AT_CMD_SUFFIX);
+                           AT_CMD_SISR_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, ANALYZER_PACKET_SIZE, AT_CMD_SUFFIX);
     // send command
     sendATcommand(command_to_send_buffer, cmd_size);
     //^SISR: <srvProfileId>, <cnfReadLength>
@@ -1069,12 +1094,16 @@ void waitForULAck() {
     //OK or ERROR
     handleSISRresponse();
 }
-//todo speed_packet
+
+
+/**
+ * This method will receive #ANALYZER_PACKET_SIZE Bytes over the TCP socket.
+ */
 void receiveSpeedPacket() {
     int cnfWriteLength;
     int recv = 0;
     while (recv < ANALYZER_PACKET_SIZE) {
-        // AT^SISR=<srvProfileId>, <reqWriteLength>
+        // AT^SISR=<srvProfileId>, <reqReadLength>
         int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d\"%s",
                                AT_CMD_SISR_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, ANALYZER_PACKET_SIZE-recv, AT_CMD_SUFFIX);
         // send command

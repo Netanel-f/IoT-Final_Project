@@ -123,7 +123,7 @@ bool CellularSetOperator(int mode, char *operatorNamem, int act);
  */
 bool CellularGetOperators(OPERATOR_INFO *opList, int maxops, int *numOpsFound);
 
-
+//todo
 bool CellularGetSpecificOperators(OPERATOR_INFO *opList, int maxops, int *numOpsFound);
 
 
@@ -185,6 +185,7 @@ int CellularGetPayload(OPERATOR_INFO *opList, int candidate_op_idx, char * iccid
  */
 int CellularGetAcT(OPERATOR_INFO * operator);
 
+
 /**
  * This method will open Internet service of given srvProfileId
  * @param serviceID
@@ -214,15 +215,36 @@ bool CellularPing(char * ip_address, int * mean_rtt);
  */
 bool socketServiceSetupProfile();
 
-//todo
+
+/**
+ * This method will check for ^SISW: URC
+ * @return <urcCauseId>
+ */
 int handleSISWURC();
-//todo
+
+
+/**
+ * This method will check for ^SISR: URC
+ * @return <urcCauseId>
+ */
 int handleSISRURC();
-//todo
+
+
+/**
+ * This method will send #ANALYZER_PACKET_SIZE Bytes over the TCP socket.
+ */
 void sendSpeedPacket();
-//todo
+
+
+/**
+ * This method consume the pre defined server special upload ack for the entire upload test.
+ */
 void waitForULAck();
-//todo
+
+
+/**
+ * This method will receive #ANALYZER_PACKET_SIZE Bytes over the TCP socket.
+ */
 void receiveSpeedPacket();
 
 /**
