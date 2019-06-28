@@ -1,7 +1,28 @@
+#include <iostream>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
 #include <algorithm>
-#include "shared.h"
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <vector>
+#include <map>
+#include <chrono>
+using namespace std::chrono;
+
+
+#define MAX_INCOMING_QUEUE 10
+#define PORT_NUMBER 54321
+#define MAX_PACKET_SIZE_BYTES 1048576
+
 #define ANALYZER_TOTAL_PACKETS 1000
 #define ANALYZER_PACKET_SIZE 1500
+
+#define DEBUG true
 
 class Server {
     int welcome_socket;
@@ -24,7 +45,7 @@ public:
     void selectPhase();
     void downloadTest(int client_fd);
     void uploadTest(int client_fd);
-    void echoClient(int client_fd);
+//    void echoClient(int client_fd);
     void killServer();
 
 private:
@@ -192,45 +213,45 @@ void Server::uploadTest(int client_fd) {
         return downloadTest(client_fd);
     }
 }
-/**
- * This method will echo to specific client fd
- * @param client_fd client socket fd to echo.
- */
-void Server::echoClient(int client_fd) {
-    ssize_t ret_value = recv(client_fd, this->read_buffer, (size_t) MAX_PACKET_SIZE_BYTES, 0);
-    if (ret_value < 0) { print_error("recv() failed", errno); }
-
-	if (DEBUG) { printf("received: %s\n", this->read_buffer); }
-
-    /* return value == 0:
-     * Means we didn't read anything from client - we assume client closed the socket.
-     * Quote from recv() manual:
-     * When a stream socket peer has performed an orderly shutdown,
-     * the return value will be 0 (the traditional "end-of-file" return). */
-    if (ret_value == 0) {
-        // close client socket
-        FD_CLR(client_fd, &this->clients_fds);
-
-        ret_value = shutdown(client_fd, SHUT_RDWR);
-        if (ret_value < 0) { print_error("shutdown() failed.", errno); }
-
-        ret_value = close(client_fd);
-        if (ret_value < 0) { print_error("close() failed.", errno); }
-
-        this->clients_sockets.erase(std::to_string(client_fd));
-        if (DEBUG) { printf("**erasing %d\n", client_fd); }
-        if (this->clients_sockets.empty()) {
-            if (DEBUG) { printf("**client_sockets empty\n"); }
-
-        }
-
-    } else {
-        ret_value = send(client_fd, this->read_buffer, (size_t) ret_value, 0);
-        if (ret_value < 0) { print_error("send() failed", errno); }
-        memset(this->read_buffer, '\0', ret_value);
-    }
-
-}
+///**
+// * This method will echo to specific client fd
+// * @param client_fd client socket fd to echo.
+// */
+//void Server::echoClient(int client_fd) {
+//    ssize_t ret_value = recv(client_fd, this->read_buffer, (size_t) MAX_PACKET_SIZE_BYTES, 0);
+//    if (ret_value < 0) { print_error("recv() failed", errno); }
+//
+//	if (DEBUG) { printf("received: %s\n", this->read_buffer); }
+//
+//    /* return value == 0:
+//     * Means we didn't read anything from client - we assume client closed the socket.
+//     * Quote from recv() manual:
+//     * When a stream socket peer has performed an orderly shutdown,
+//     * the return value will be 0 (the traditional "end-of-file" return). */
+//    if (ret_value == 0) {
+//        // close client socket
+//        FD_CLR(client_fd, &this->clients_fds);
+//
+//        ret_value = shutdown(client_fd, SHUT_RDWR);
+//        if (ret_value < 0) { print_error("shutdown() failed.", errno); }
+//
+//        ret_value = close(client_fd);
+//        if (ret_value < 0) { print_error("close() failed.", errno); }
+//
+//        this->clients_sockets.erase(std::to_string(client_fd));
+//        if (DEBUG) { printf("**erasing %d\n", client_fd); }
+//        if (this->clients_sockets.empty()) {
+//            if (DEBUG) { printf("**client_sockets empty\n"); }
+//
+//        }
+//
+//    } else {
+//        ret_value = send(client_fd, this->read_buffer, (size_t) ret_value, 0);
+//        if (ret_value < 0) { print_error("send() failed", errno); }
+//        memset(this->read_buffer, '\0', ret_value);
+//    }
+//
+//}
 
 
 /**
