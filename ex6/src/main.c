@@ -39,7 +39,7 @@ void printTestResults(OPERATOR_INFO * operatorInfo, long double ul_bps, long dou
 #define TRANSMIT_URL "http://51.143.141.28:8086/write?db=mydb"
 #define TRANS_RES_BUF_SIZE 100
 #define MAX_PAYLOAD_SIZE 255
-#define ANALYZER_FORMAT "networkAnalyzer,ICCID=%s latitude=%f,longitude=%f,altitude=%d,opt_code=%d,opt_act=%s,opt_ul=%f,opt_dl=%f,opt_latency=%d "
+#define ANALYZER_FORMAT "iNetworkAnalyzer,ICCID=%s latitude=%f,longitude=%f,altitude=%d,opt_code=%d,opt_act=%s,opt_ul=%f,opt_dl=%f,opt_latency=%d"
 //todo
 #define BYTES_TO_BITS 8
 #define KILOBIT_IN_BITS 1000
@@ -48,7 +48,7 @@ void printTestResults(OPERATOR_INFO * operatorInfo, long double ul_bps, long dou
 #define Kbps_STR "Kbps"
 #define bps_STR "bps"
 
-enum PROCEDURE_TO_RUN{WELCOME_SCREEN, INIT_TEST, TEST_IN_PROGRESS, EXIT_TEST};
+enum PROCEDURE_TO_RUN{WELCOME_SCREEN, WAIT_FOR_USER, INIT_TEST, TEST_IN_PROGRESS, EXIT_TEST};
 
 /**************************************************************************//**
  * 							GLOBAL VARIABLES
@@ -64,7 +64,7 @@ static char* GPS_PORT = "3";
 static char* MODEM_PORT = "0";
 #endif
 
-bool DEBUG = false;
+bool DEBUG = true;
 volatile uint32_t msTicks = 0; /* counts 1ms timeTicks */
 
 enum PROCEDURE_TO_RUN CURRENT_OPERATION = WELCOME_SCREEN;
@@ -188,36 +188,42 @@ int main(void)
 
 	/* Main loop */
 	while(CURRENT_OPERATION != EXIT_TEST) {
-		if (CURRENT_OPERATION == WELCOME_SCREEN) {
-			CURRENT_OPERATION = INIT_TEST;
-			printf("\f Welcome to\n   iNetworkAnalyzer\n");
+		if (CURRENT_OPERATION == WELCOME_SCREEN) {//todo fix
+			printf("\f Welcome to\n  iNetworkAnalyzer\n");
 			printf(" BTN1:\n  Analyze Cell Network\n");
 			printf(" BTN0:\n  Exit iNA\n");
+			CURRENT_OPERATION = WAIT_FOR_USER;
 
 		} else if (CURRENT_OPERATION == INIT_TEST) {
 			/* Get GPS + available operators  */
+			if (DEBUG) { printf("INIT_TEST\n"); }
 			num_of_operators_found = getPreTestData();
 			if (num_of_operators_found > 0) {
 				CURRENT_OPERATION = TEST_IN_PROGRESS;
-
 			} else {
 				CURRENT_OPERATION = WELCOME_SCREEN;
 				Delay(1000);
 			}
 
 		} else if (CURRENT_OPERATION == TEST_IN_PROGRESS) {
+			if (DEBUG) { printf("TEST_IN_PROGRESS\n"); }
             testOperators();
             Delay(3000);
             CURRENT_OPERATION = WELCOME_SCREEN;
 		}
 	}
 
-	printf("\nDisabling Cellular and exiting..\n");
+	printf("\f\n  Disabling Cellular and GPS..\n");
 	CellularDisable();
 	GPSDisable();
 
 	free(current_location);
 	free(found_operators);
+    /* Clear screen */
+    printf("\f\n\n\n      Goodbye!");
+    Delay(1000);
+    /* Clear screen */
+    printf("\f");
 	exit(0);
 }
 
@@ -232,11 +238,11 @@ int getPreTestData() {
 	memset(speed_results, '\0', MAX_PAYLOAD_SIZE);//todo check size
 
 	/* Get GPS data */
-	while (current_location->valid_fix == 0) {
+	do {
 		GPSGetFixInformation(current_location);
-	}
+	} while (current_location->valid_fix == 0);
 
-	/* clear candidate_operators struct */
+	/* clear found_operators struct */
 	for (int i=0; i < iNA_MAX_CANDIDATE_CELL_OPS; i++) {
 		memset(found_operators[i].operatorName, '\0', MAX_OPERATOR_NAME_SIZE);
 		memset(found_operators[i].accessTechnology, '\0', MAX_OPERATOR_TECH_SIZE);
@@ -247,6 +253,15 @@ int getPreTestData() {
 	/* Get all available operators */
 	/* Makes sure modem is  responding to AT commands. */
 	while (!CellularCheckModem());
+
+	/* setup internet connection profile */
+	while (!CellularSetupInternetConnectionProfile(20)) {
+		printf("Failed to setup Internet connection");
+	}
+	/* Setup TCP socket service profile */
+	while (!socketServiceSetupProfile(SPEEDTEST_SERVER_ADDR)) {
+		printf("Failed to setup TCP Socket service");
+	}
 
 	/* Setting modem to unregister from current operator and remain unregistered. */
 	while (!CellularSetOperator(DEREGISTER, NULL, 0));
@@ -311,7 +326,7 @@ void testOperators() {
 
                     long double ul_bps, dl_bps, latency;
                     int mean_rtt;
-                    /* measure internet performances */
+                    /* measure internet performance */
                     testSpeed(&ul_bps, &dl_bps);
                     CellularPing(SPEEDTEST_PING_ADDR, &mean_rtt);
                     latency = mean_rtt / 2.0;
@@ -321,7 +336,6 @@ void testOperators() {
 
 					/* print result to screen */
                     printTestResults(&found_operators[op_index], ul_bps, dl_bps, latency);
-
 
 
 				} else {
@@ -346,19 +360,11 @@ void testSpeed(long double * ul_bps, long double * dl_bps) {
 
     // send 1000 packets of 1500 bytes. and wait for server response.
 
-    /* we registered to operator, setup Internet connection */
-    if (!CellularSetupInternetConnectionProfile(20)) {
-        printf("Failed to setup Internet connection");
-        return;
-    }
-    /* Setup TCP socket service profile */
-    if (!socketServiceSetupProfile(SPEEDTEST_SERVER_ADDR)) {
-        printf("Failed to setup TCP Socket service");
-        return;
-    }
     /* Open socket service profile */
     if (!serviceProfileOpen(SOCKET_SRV_PROFILE_ID)) {
         printf("Failed to open Socket service");
+        /* Close socket service profile */
+		while (!serviceProfileClose(SOCKET_SRV_PROFILE_ID));
         return;
     }
 
@@ -367,7 +373,6 @@ void testSpeed(long double * ul_bps, long double * dl_bps) {
         printf("handle ^SISW failed");
         return;
     }
-
     ul_start = msTicks;
     while (scnt < ANALYZER_TOTAL_PACKETS) {
         sendSpeedPacket();
@@ -419,7 +424,7 @@ void transmit_results(OPERATOR_INFO * current_op, float ul, float dl, int latenc
 
 	//FORMAT "networkAnalyzer,ICCID=%s latitude=%f,longitude=%f,altitude=%d,opt_code=%d,opt_act=%s,opt_ul=%f,opt_dl=%f,opt_latency=%d "
 	int	payload_len = sprintf(payload_buffer, ANALYZER_FORMAT,
-								  iccid, lat_deg, long_deg, current_location->altitude, current_op->operatorCode, current_op->accessTechnology, ul, dl, latency);
+								  iccid, lat_deg, long_deg, current_location->altitude, current_op->operatorCode, (current_op->accessTechnology)[0], ul, dl, latency);
     // transmit GPS data over HTTP
     if (CellularSendHTTPPOSTRequest(TRANSMIT_URL, payload_buffer, payload_len, transmit_response, TRANS_RES_BUF_SIZE) == -1) {
         printf("Failed\n");
@@ -485,16 +490,14 @@ void GPIO_Unified_IRQ(void) {
 	/* Act on interrupts */
 	if (interruptMask & (1 << BSP_GPIO_PB0_PIN)) {
 	    /* exit the app possible only on welcome screen */
-	    if (CURRENT_OPERATION == WELCOME_SCREEN) {
-            /* Clear screen */
-            printf("\f\n\n\n   Goodbye!");
+	    if (CURRENT_OPERATION == WAIT_FOR_USER) {
             CURRENT_OPERATION = EXIT_TEST;
 	    }
 	}
 
 	if (interruptMask & (1 << BSP_GPIO_PB1_PIN)) {
 		/* run test is possible only on welcome screen */
-		if (CURRENT_OPERATION == WELCOME_SCREEN) {
+		if (CURRENT_OPERATION == WAIT_FOR_USER) {
 			/* Clear screen */
 			printf("\f");
 			/* set flag */

@@ -17,7 +17,7 @@
 *****************************************************************************/
 static uint32_t rxReadIndex = 0;
 static uint32_t rxWriteIndex = 0;
-static char rxBufferCellular[RX_BUFFER_SIZE_CELL]; // Software receive buffer
+//static char rxBufferCellular[RX_BUFFER_SIZE_CELL]; // Software receive buffer
 
 
 void initUSART(void)
@@ -114,17 +114,27 @@ unsigned int SerialRecvCellular(unsigned char *buf, unsigned int maxlen, unsigne
 			buf[i++] = rxBufferCellular[rxReadIndex];
 			rxReadIndex = (++rxReadIndex) % RX_BUFFER_SIZE_CELL;
 		}
-		if (i >= 4) {
-			if (strncmp(&buf[i-4], "OK\r\n", 4) == 0) {
+		if (i >= 2 && (strcmp(&buf[i-2], "\r\n") == 0)) {
+			memset(&buf[i-2], '\0', 2);
+			i = i - 2;
+			if (i > 0) {
 				break;
 			}
 		}
-		if (i >= 7) {
-			if (strncmp(&buf[i-7], "ERROR\r\n", 7) == 0) {
-				break;
-			}
-		}
+//		if (i >= 4) {
+//			if (strncmp(&buf[i-4], "OK\r\n", 4) == 0) {
+//				if (DEBUG) {printf("~%s\n~~%s~\n", buf, &rxBufferCellular[rxReadIndex]);}
+//				break;
+//			}
+//		}
+//		if (i >= 7) {
+//			if (strncmp(&buf[i-7], "ERROR\r\n", 7) == 0) {
+//				if (DEBUG) {printf("~%s\n~~%s~\n", buf, &rxBufferCellular[rxReadIndex]);}
+//				break;
+//			}
+//		}
 	}
+//	if (i && DEBUG) { printf("~%s~\n", buf); }
 	return i;
 }
 

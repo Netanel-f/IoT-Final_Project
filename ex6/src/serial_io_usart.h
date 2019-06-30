@@ -18,8 +18,9 @@
  * 								DEFS
 *****************************************************************************/
 #define SERIAL_TIMEOUT -1
-#define RX_BUFFER_SIZE_CELL 1000             // Software receive buffer size
-
+//#define RX_BUFFER_SIZE_CELL 1000             // Software receive buffer size
+#define RX_BUFFER_SIZE_CELL 1600             // Software receive buffer size
+static char rxBufferCellular[RX_BUFFER_SIZE_CELL]; // Software receive buffer
 extern volatile uint32_t msTicks;
 extern bool DEBUG;
 

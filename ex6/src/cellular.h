@@ -35,6 +35,7 @@ typedef struct __OPERATOR_INFO {
 #define PARTNER_MCC_MNC 42501
 #define CELLCOM_MCC_MNC 42502
 #define PELEPHONE_MCC_MNC 42503
+#define MAX_ISRAEL_OPS 20
 #define MAX_CANDIDATE_CELL_OPS 3
 #define iNA_MAX_CANDIDATE_CELL_OPS 6
 
@@ -44,7 +45,7 @@ typedef struct __OPERATOR_INFO {
 //<srvProfileId> is needed to select a specific service profile.
 #define HTTP_SRV_PROFILE_ID 6
 #define SOCKET_SRV_PROFILE_ID 9
-#define ANALYZER_TOTAL_PACKETS 1000
+#define ANALYZER_TOTAL_PACKETS 100
 #define ANALYZER_PACKET_SIZE 1500
 
 /**************************************************************************//**

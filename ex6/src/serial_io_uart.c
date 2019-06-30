@@ -12,7 +12,7 @@
 *****************************************************************************/
 static uint32_t rxDataReady = 0;      // Flag indicating receiver does not have data
 static char rxBufferGPS[RX_BUFFER_SIZE_GPS]; // Software receive buffer
-static char consmuerRxBuf[RX_BUFFER_SIZE_GPS];   // NMEA messages buffer to consmuer
+static char consmuerRxBuf[RX_BUFFER_SIZE_GPS];   // NMEA messages buffer to consumer
 
 /******************************************************************************
  * @brief
