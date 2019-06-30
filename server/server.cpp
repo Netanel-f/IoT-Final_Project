@@ -19,7 +19,7 @@ using namespace std::chrono;
 #define PORT_NUMBER 54321
 #define MAX_PACKET_SIZE_BYTES 1048576
 
-#define ANALYZER_TOTAL_PACKETS 1000
+#define ANALYZER_TOTAL_PACKETS 100
 #define ANALYZER_PACKET_SIZE 1500
 
 #define DEBUG true
@@ -122,8 +122,8 @@ void Server::selectPhase() {
             if (this->clients_sockets.empty()) {
                 // no clients kill server
                 if (DEBUG) { printf("**no clients!!\n"); }
-                keep_loop_select = false;
-                break;
+                //keep_loop_select = false;
+                //break;
 
             } else {
                 continue;
@@ -143,6 +143,7 @@ void Server::selectPhase() {
                 FD_SET(new_client_socket, &clients_fds);
                 clients_sockets.emplace(std::to_string(new_client_socket), new_client_socket);
                 //todo
+		if (DEBUG) { printf("**new client connected\n"); }
             }
         }
 
