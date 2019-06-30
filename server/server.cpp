@@ -19,7 +19,8 @@ using namespace std::chrono;
 #define PORT_NUMBER 54321
 #define MAX_PACKET_SIZE_BYTES 1048576
 
-#define ANALYZER_TOTAL_PACKETS 100
+#define ANALYZER_TOTAL_PACKETS 10
+//#define ANALYZER_TOTAL_PACKETS 100
 #define ANALYZER_PACKET_SIZE 1500
 
 #define DEBUG true
@@ -170,13 +171,24 @@ void Server::selectPhase() {
  */
 void Server::downloadTest(int client_fd) {
     int ret_value = 0;
+    unsigned int bytes_sent;
     strcpy(this->read_buffer, speed_str.c_str());
+    if (DEBUG) { printf("DOWNLOAD TEST \n"); }
+
 
     while (this->scnt < ANALYZER_TOTAL_PACKETS) {
-        ret_value = send(client_fd, this->read_buffer, ANALYZER_PACKET_SIZE, 0);
-        if (ret_value < 0) { print_error("send() failed", errno); }
+        bytes_sent = 0;
+        if (DEBUG) { printf("#packets sent: %d\n", this->scnt); }
+
+        while (bytes_sent < ANALYZER_PACKET_SIZE) {
+            ret_value = send(client_fd, this->read_buffer, ANALYZER_PACKET_SIZE, 0);
+            if (ret_value < 0) { print_error("send() failed", errno); }
+            bytes_sent = bytes_sent + ret_value;
+        }
         this->scnt++;
     }
+    if (DEBUG) { printf("#packets sent: %d\n", this->scnt); }
+    if (DEBUG) { printf("DOWNLOAD TEST FINISHED\n"); }
 
     // close client socket
     FD_CLR(client_fd, &this->clients_fds);
@@ -189,6 +201,7 @@ void Server::downloadTest(int client_fd) {
 
     this->clients_sockets.erase(std::to_string(client_fd));
     if (DEBUG) { printf("**erasing %d\n", client_fd); }
+
     if (this->clients_sockets.empty()) {
         if (DEBUG) { printf("**client_sockets empty\n"); }
 
@@ -201,14 +214,25 @@ void Server::downloadTest(int client_fd) {
  * @param client_fd client file descriptor
  */
 void Server::uploadTest(int client_fd) {
-    ssize_t ret_value = recv(client_fd, this->read_buffer, (size_t) MAX_PACKET_SIZE_BYTES, 0);
-    if (ret_value < 0) { print_error("recv() failed", errno); }
+    unsigned int bytes_received = 0;
+    ssize_t ret_value;
 
-    if (DEBUG) { printf("received: %s\n", this->read_buffer); }
+    while (bytes_received < ANALYZER_PACKET_SIZE) {
+        ret_value = recv(client_fd, this->read_buffer, (size_t) MAX_PACKET_SIZE_BYTES, 0);
+        if (ret_value < 0) { print_error("recv() failed", errno); }
+
+        if (DEBUG) { printf("#%ld bytes received: %s\n", ret_value, this->read_buffer); }
+        memset(this->read_buffer, '\0', ret_value);
+        bytes_received = bytes_received + ret_value;
+    }
+
     this->rcnt++;
+    if (DEBUG) { printf("#packets received %d\n", this->rcnt); }
 
     if (this->rcnt >= ANALYZER_TOTAL_PACKETS) {
-        ret_value = send(client_fd, "UPLOAD_FINISHED", 15, 0);
+        if (DEBUG) { printf("UPLOAD FINISHED\n"); }
+
+        ret_value = send(client_fd, "UPLOAD_FINISHED\r\n", 15, 0);
         if (ret_value < 0) { print_error("send() failed", errno); }
         memset(this->read_buffer, '\0', ret_value);
         return downloadTest(client_fd);
