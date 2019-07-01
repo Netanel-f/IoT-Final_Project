@@ -40,7 +40,6 @@ void printTestResults(OPERATOR_INFO * operatorInfo, long double ul_bps, long dou
 #define TRANS_RES_BUF_SIZE 100
 #define MAX_PAYLOAD_SIZE 255
 #define ANALYZER_FORMAT "iNA,ICCID=%s latitude=%f,longitude=%f,altitude=%d,opt_code=%d,opt_act=%c,opt_ul=%Lf,opt_dl=%Lf,opt_latency=%d"
-//todo
 #define BYTES_TO_BITS 8
 #define KILOBIT_IN_BITS 1000
 #define MEGABIT_IN_BITS 1000000
@@ -64,28 +63,19 @@ static char* GPS_PORT = "3";
 static char* MODEM_PORT = "0";
 #endif
 
-bool DEBUG = true;
+bool DEBUG = false;
 volatile uint32_t msTicks = 0; /* counts 1ms timeTicks */
 
 enum PROCEDURE_TO_RUN CURRENT_OPERATION = WELCOME_SCREEN;
-//todo
 GPS_LOCATION_INFO* current_location;
 OPERATOR_INFO * found_operators;
 int num_of_operators_found;
 
-//char unix_time[UNIX_TIME_BUF_SIZE];
 char iccid[ICCID_BUFFER_SIZE];
 char payload_buffer[MAX_PAYLOAD_SIZE];
 char transmit_response[TRANS_RES_BUF_SIZE];
-char speed_results[MAX_PAYLOAD_SIZE];//todo check size
-//todo set profiles only once.
+char speed_results[MAX_PAYLOAD_SIZE];
 
-//static int speed_limit = MIN_SPEED_LIM;
-//static bool high_speed_flag = false;
-//static bool transmit_speed_event = false;
-//static uint32_t last_location_Ticks = 0;
-//static uint32_t old_location_Ticks = 0;
-//static bool part2_registered = false;
 
 /***************************************************************************//**
  * @brief SysTick_Handler
@@ -188,7 +178,7 @@ int main(void)
 
 	/* Main loop */
 	while(CURRENT_OPERATION != EXIT_TEST) {
-		if (CURRENT_OPERATION == WELCOME_SCREEN) {//todo fix
+		if (CURRENT_OPERATION == WELCOME_SCREEN) {
 			printf("\f Welcome to\n  iNetworkAnalyzer\n");
 			printf(" BTN1:\n  Analyze Cell Network\n");
 			printf(" BTN0:\n  Exit iNA\n");
@@ -227,6 +217,7 @@ int main(void)
 	exit(0);
 }
 
+
 /**
  * This method will get the current location & will check the available operators.
  * @return number of networks of the specific 3 Major operators (Partner, Cellcom, Pelephone)
@@ -235,7 +226,7 @@ int getPreTestData() {
 	/* clear current_location struct */
     memset(current_location->fixtime, '\0', GPS_LOC_INFO_TIME_BUF_SIZE);
     /* clear speed results buffer */
-	memset(speed_results, '\0', MAX_PAYLOAD_SIZE);//todo check size
+	memset(speed_results, '\0', MAX_PAYLOAD_SIZE);
 
 	/* Get GPS data */
 	bool result = false;
@@ -338,6 +329,7 @@ void testOperators() {
 
 						/* print result to screen */
 						printTestResults(&found_operators[op_index], ul_bps, dl_bps, latency);
+						Delay(5000);
                     }
 					continue;
 				} else {
@@ -354,13 +346,14 @@ void testOperators() {
  * This method will test speed of current operator by setting up socket connection
  * @param ul_bps long double pointer to save upload bitrate to
  * @param dl_bps long double pointer to save download bitrate to
+ * @return true iff speed test executed successfully.
  */
 bool testSpeed(long double * ul_bps, long double * dl_bps) {
     int scnt = 0;
     int rcnt = 0;
     uint32_t ul_start, ul_end, dl_start, dl_end;
 
-    // send 1000 packets of 1500 bytes. and wait for server response.
+    // send 10 packets of 1500 bytes. and wait for server response.
 
     /* Open socket service profile */
     if (!serviceProfileOpen(SOCKET_SRV_PROFILE_ID)) {
@@ -372,7 +365,6 @@ bool testSpeed(long double * ul_bps, long double * dl_bps) {
 
     // handle ^SISW: 9,1
     if (!waitForSimpleResponse("^SISW: 9,1")) {
-//    if (handleSISWURC() != 1) {
         printf("handle ^SISW failed");
         return false;
     }
@@ -383,13 +375,11 @@ bool testSpeed(long double * ul_bps, long double * dl_bps) {
         scnt++;
     }
     if (DEBUG) {printf("#packets sent: %d\n", scnt); }
-    // handle ^SISR: 9,1 - wait for ack packet
+    // handle ^SISR: 9,1 - wait for ACK packet
     bool temp_result = waitForSimpleResponse("^SISR: 9,1");
-//    int temp_result = handleSISRURC();
     ul_end = msTicks;
 
     if (!temp_result) {
-//    if (temp_result != 1) {
         printf("handle ^SISR failed");
         return false;
     }
@@ -402,6 +392,7 @@ bool testSpeed(long double * ul_bps, long double * dl_bps) {
         rcnt++;
     }
     if (DEBUG) {printf("#packets received: %d\n", rcnt); }
+
     dl_end = msTicks;
 
     *ul_bps = BYTES_TO_BITS * (ANALYZER_TOTAL_PACKETS * ANALYZER_PACKET_SIZE / ((ul_end - ul_start)/1000));
@@ -417,7 +408,7 @@ bool testSpeed(long double * ul_bps, long double * dl_bps) {
 
 
 /**
- * This method will create the operator results payload and transmit it DB
+ * This method will create the operator results pay load and transmit it DB
  * @param current_op tested operator
  * @param ul upload bitrate bps
  * @param dl download bitrate bps
@@ -428,20 +419,21 @@ void transmit_results(OPERATOR_INFO * current_op, float ul, float dl, int latenc
 	/* get ICCID */
 	CellularGetICCID(iccid);
 
-	//latitude= 31.7498445,longitude= 35.1838178,altitude=10,hdop=2,valid_fix=1,num_sats=4 1557086230000000000
 	float lat_deg = (current_location->latitude) / 10000000.0;
 	float long_deg = (current_location->longitude) / 10000000.0;
 
 	//FORMAT "iNA,ICCID=%s latitude=%f,longitude=%f,altitude=%d,opt_code=%d,opt_act=%c,opt_ul=%f,opt_dl=%f,opt_latency=%d"
 	int	payload_len = sprintf(payload_buffer, ANALYZER_FORMAT,
-								  iccid, lat_deg, long_deg, current_location->altitude, current_op->operatorCode, current_op->accessTechnology[0], ul, dl, latency);
+								  iccid, lat_deg, long_deg, current_location->altitude,
+								  current_op->operatorCode, current_op->accessTechnology[0], ul, dl, latency);
+
     // transmit GPS data over HTTP
     if (CellularSendHTTPPOSTRequest(TRANSMIT_URL, payload_buffer, payload_len, transmit_response, TRANS_RES_BUF_SIZE) == -1) {
         printf("Failed\n");
     }
 
     // check the service is closed
-    while (!serviceProfileClose(HTTP_SRV_PROFILE_ID));//todo check if needed
+    while (!serviceProfileClose(HTTP_SRV_PROFILE_ID));
 }
 
 

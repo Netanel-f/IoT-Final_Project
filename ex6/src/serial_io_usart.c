@@ -17,7 +17,6 @@
 *****************************************************************************/
 static uint32_t rxReadIndex = 0;
 static uint32_t rxWriteIndex = 0;
-//static char rxBufferCellular[RX_BUFFER_SIZE_CELL]; // Software receive buffer
 
 
 void initUSART(void)
@@ -121,18 +120,6 @@ unsigned int SerialRecvCellular(unsigned char *buf, unsigned int maxlen, unsigne
 				break;
 			}
 		}
-//		if (i >= 4) {
-//			if (strncmp(&buf[i-4], "OK\r\n", 4) == 0) {
-//				if (DEBUG) {printf("~%s\n~~%s~\n", buf, &rxBufferCellular[rxReadIndex]);}
-//				break;
-//			}
-//		}
-//		if (i >= 7) {
-//			if (strncmp(&buf[i-7], "ERROR\r\n", 7) == 0) {
-//				if (DEBUG) {printf("~%s\n~~%s~\n", buf, &rxBufferCellular[rxReadIndex]);}
-//				break;
-//			}
-//		}
 	}
 	if (i && DEBUG) { printf("serecv: %s serecvEND\n", buf); }
 	return i;

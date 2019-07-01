@@ -125,7 +125,16 @@ bool CellularSetOperator(int mode, char *operatorNamem, int act);
  */
 bool CellularGetOperators(OPERATOR_INFO *opList, int maxops, int *numOpsFound);
 
-//todo
+/**
+ * Forces the modem to search for available operators (Pelephone Partner Cellcome).
+ * @param opList - a pointer to the first item of an array of type CELLULAR_OP_INFO, which is
+ * allocated by the caller of this function.
+ * @param maxops - The array contains a total of maxops items.
+ * @param numOpsFound - numOpsFound is allocated by the caller and will contain the number
+ * of operators found and populated into the opList.
+ * @return Returns false if an error occurred or no operators found.
+ * Returns true and populates opList and opsFound if the command succeeded.
+ */
 bool CellularGetSpecificOperators(OPERATOR_INFO *opList, int maxops, int *numOpsFound);
 
 
@@ -201,6 +210,12 @@ bool serviceProfileOpen(int serviceID);
  */
 bool serviceProfileClose(int serviceID);
 
+
+/**
+ * This method will wait for consuming the expected response from cellular.
+ * @return true iff expected response received, false otherwise.
+ */
+bool waitForSimpleResponse(unsigned char * expected_response);
 
 /**
  * This method will make a ping to given address and will return the mean rtt it took

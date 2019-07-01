@@ -6,8 +6,6 @@
  * 								DECLARATIONS
 *****************************************************************************/
 void sendATcommand(unsigned char* command, unsigned int command_size);
-bool waitForOK();
-bool waitForATresponse(unsigned char ** token_array, unsigned char * expected_response, unsigned int response_size, int max_responses, unsigned int timeout_ms);
 int splitBufferToResponses(unsigned char * buffer, unsigned char ** tokens_array, int max_tokens);
 int splitCopsResponseToOpsTokens(unsigned char * cops_response, OPERATOR_INFO *opList, int max_ops, bool specific_operators);
 bool splitOpTokensToOPINFO(unsigned char * op_token, OPERATOR_INFO *opInfo, bool specific_operators);
@@ -17,7 +15,6 @@ bool getResponse(unsigned char * response_buffer, unsigned int buf_len, unsigned
 /*****************************************************************************
  * 								DEFS
 *****************************************************************************/
-//#define MAX_INCOMING_BUF_SIZE 1000//todo
 #define MAX_INCOMING_BUF_SIZE 1600
 #define MAX_OP_TOKEN_SIZE 50
 #define MAX_AT_CMD_LEN 100
@@ -95,8 +92,6 @@ void CellularInit(char *port){
 
         // check modem responded with ^+PBREADY
         while (!waitForSimpleResponse(AT_RES_PBREADY));
-//        unsigned char * token_array[5] = {};
-//        while(!waitForATresponse(token_array, AT_RES_PBREADY, sizeof(AT_RES_PBREADY) - 1, 5, GENERAL_RECV_TIMEOUT_MS));
 
         bool echo_off = false;
         printf("Setting echo off...");
@@ -106,7 +101,6 @@ void CellularInit(char *port){
 
             // verify echo off
             echo_off = waitForSimpleResponse(AT_RES_OK);
-//            echo_off = waitForOK();
         }
 
         printf("successfully.\n");
@@ -141,7 +135,6 @@ bool CellularCheckModem(void){
         sendATcommand(AT_CMD_AT, sizeof(AT_CMD_AT) - 1);
 
         // verify modem response
-//        if (waitForOK()) {
         if (waitForSimpleResponse(AT_RES_OK)) {
             printf("modem is responsive.\n");
             return true;
@@ -182,17 +175,6 @@ bool CellularGetRegistrationStatus(int *status){
 		return true;
     }
     return false;
-
-//	unsigned char * token_array[5] = {};
-//	if (waitForATresponse(token_array, AT_RES_OK, sizeof(AT_RES_OK) - 1, 5, GENERAL_RECV_TIMEOUT_MS)) {
-//		// "+CREG: <Mode>,<regStatus>"
-//		char * token;
-//		token = strtok(token_array[0], ",");
-//		token = strtok(NULL, ",");
-//		*status = atoi(token);
-//		return true;
-//	}
-//    return false;
 }
 
 
@@ -230,22 +212,6 @@ bool CellularGetSignalQuality(int *csq) {
 		}
 	}
 	return false;
-
-//	unsigned char * token_array[5] = {};
-//	if (waitForATresponse(token_array, AT_RES_OK, sizeof(AT_RES_OK) - 1, 5, GENERAL_RECV_TIMEOUT_MS)) {
-//		char * token;
-//		token = strtok(&(token_array[0])[5], ",");
-//		if (strcmp(token, "99") != 0) {
-//			// -113 + 2* rssi
-//			int rssi = atoi(token);
-//			*csq = -113 + (2 * rssi);
-//			return true;
-//		}
-//	}
-//
-//    return false;
-
-
 }
 
 
@@ -273,8 +239,6 @@ bool CellularSetOperator(int mode, char *operatorName, int act){
     	int cmd_size = sprintf(command_to_send_buffer, "%s%d%s", AT_CMD_COPS_WRITE_PREFIX, mode, AT_CMD_SUFFIX);
     	// wait for OK
 		return waitForSimpleResponse(AT_RES_OK);
-//    	unsigned char * token_array[5] = {};
-//    	return waitForATresponse(token_array, AT_RES_OK, sizeof(AT_RES_OK) - 1, 5, GET_OPS_TIMEOUT_MS);
 
     } else if (mode == DEREGISTER) {
         int cmd_size = sprintf(command_to_send_buffer, "%s%d%s", AT_CMD_COPS_WRITE_PREFIX, mode, AT_CMD_SUFFIX);
@@ -284,14 +248,12 @@ bool CellularSetOperator(int mode, char *operatorName, int act){
 
         // wait for OK
         return waitForSimpleResponse(AT_RES_OK);
-//        return waitForOK();
 
     } else if (mode == SPECIFIC_OP) {
         int cmd_size = sprintf(command_to_send_buffer, "%s%d,0,%s,%d%s", AT_CMD_COPS_WRITE_PREFIX, mode, operatorName, act, AT_CMD_SUFFIX);
         sendATcommand(command_to_send_buffer, cmd_size);
 
         return waitForSimpleResponse(AT_RES_OK);
-//        return waitForOK();
 
     } else {
         return false;
@@ -306,8 +268,7 @@ bool CellularSetOperator(int mode, char *operatorName, int act){
  * @param maxops - The array contains a total of maxops items.
  * @param numOpsFound - numOpsFound is allocated by the caller and will contain the number
  * of operators found and populated into the opList.
- * @return Returns false if an error
-red or no operators found.
+ * @return Returns false if an error red or no operators found.
  * Returns true and populates opList and opsFound if the command succeeded.
  */
 bool CellularGetOperators(OPERATOR_INFO *opList, int maxops, int *numOpsFound){
@@ -319,7 +280,7 @@ bool CellularGetOperators(OPERATOR_INFO *opList, int maxops, int *numOpsFound){
 		if (strcmp(response, AT_RES_ERROR) == 0) {
 			return false;
 		}
-		 char operators[MAX_INCOMING_BUF_SIZE];
+		char operators[MAX_INCOMING_BUF_SIZE];
 		memset(operators, '\0', MAX_INCOMING_BUF_SIZE);
 
 		// this remove "+COPS: "
@@ -335,26 +296,6 @@ bool CellularGetOperators(OPERATOR_INFO *opList, int maxops, int *numOpsFound){
 		}
 	}
 	return false;
-
-
-//
-//    unsigned char * token_array[10] = {};
-//    if (waitForATresponse(token_array, AT_RES_OK, sizeof(AT_RES_OK) - 1, 10, GET_OPS_TIMEOUT_MS)) {
-//
-//        char operators[MAX_INCOMING_BUF_SIZE];
-//        memset(operators, '\0', MAX_INCOMING_BUF_SIZE);
-//
-//        // this remove "+COPS: "
-//        strncpy(operators, &(token_array[0])[7], strlen(token_array[0]) - 7);
-//
-//        int num_of_found_ops = splitCopsResponseToOpsTokens(operators, opList, maxops, false);
-//        // fill results
-//        if (num_of_found_ops != 0) {
-//            *numOpsFound = num_of_found_ops;
-//            return true;
-//        }
-//    }
-//    return false;
 }
 
 
@@ -383,25 +324,6 @@ bool CellularGetSpecificOperators(OPERATOR_INFO *opList, int maxops, int *numOps
 		}
 	}
 	return false;
-
-
-//    unsigned char * token_array[10] = {};
-//    if (waitForATresponse(token_array, AT_RES_OK, sizeof(AT_RES_OK) - 1, 10, GET_OPS_TIMEOUT_MS)) {
-//
-//        char operators[MAX_INCOMING_BUF_SIZE];
-//        memset(operators, '\0', MAX_INCOMING_BUF_SIZE);
-//
-//        // this remove "+COPS: "
-//        strncpy(operators, &(token_array[0])[7], strlen(token_array[0]) - 7);
-//
-//        int num_of_found_ops = splitCopsResponseToOpsTokens(operators, opList, maxops, true);
-//        // fill results
-//        if (num_of_found_ops != 0) {
-//            *numOpsFound = num_of_found_ops;
-//            return true;
-//        }
-//    }
-//    return false;
 }
 
 
@@ -419,17 +341,6 @@ void sendATcommand(unsigned char* command, unsigned int command_size) {
 	}
 }
 
-////todo
-//bool getSimpleResponse() {
-//	unsigned char incoming_buffer[10] = "";
-//	memset(incoming_buffer, '\0', 10);
-//	unsigned int bytes_received = SerialRecvCellular(incoming_buffer, 10, GENERAL_RECV_TIMEOUT_MS);
-//	if (DEBUG) { printf("\n%s\n", incoming_buffer); }
-//	if (bytes_received){
-//		return (strcmp(incoming_buffer, AT_RES_OK) == 0);
-//	}
-//	return false;
-//}
 
 bool waitForSimpleResponse(unsigned char * expected_response) {
 	unsigned int bytes_received = SerialRecvCellular(incoming_response_buffer, MAX_INCOMING_BUF_SIZE, GENERAL_RECV_TIMEOUT_MS);
@@ -442,80 +353,16 @@ bool waitForSimpleResponse(unsigned char * expected_response) {
 	return false;
 }
 
+
 bool getResponse(unsigned char * response_buffer, unsigned int buf_len, unsigned int timeout_ms) {
 	memset(response_buffer, '\0', buf_len);
 	unsigned int bytes_received = SerialRecvCellular(response_buffer, buf_len, timeout_ms);
-//	if (DEBUG) { printf("\n%s\n", response_buffer); }
 	return bytes_received;
-}
-/**
- * This method will wait for OK as response
- * @return true iff OK was the last token received
- */
-bool waitForOK() {
-    unsigned char incoming_buffer[MAX_INCOMING_BUF_SIZE] = "";
-    unsigned char * token_array[10] = {};
-    unsigned int bytes_received = 0;
-    int num_of_tokens = 0;
-
-	memset(incoming_buffer, '\0', MAX_INCOMING_BUF_SIZE);
-	bytes_received = SerialRecvCellular(incoming_buffer, MAX_INCOMING_BUF_SIZE, GENERAL_RECV_TIMEOUT_MS);
-	if (DEBUG) { printf("\n%s\n", incoming_buffer); }
-
-	if (bytes_received > 0) {
-		num_of_tokens = splitBufferToResponses(incoming_buffer, token_array, 10);
-
-		if (num_of_tokens > 0) {
-			return (memcmp(token_array[num_of_tokens-1], AT_RES_OK, sizeof(AT_RES_OK) - 1) == 0);
-		}
-	}
-
-	return false;
-}
-
-
-/**
- * This method will wait for specific response
- * @return true iff the given response was the last token received
- */
-bool waitForATresponse(unsigned char ** token_array, unsigned char * expected_response,
-        unsigned int response_size, int max_responses, unsigned int timeout_ms) {
-
-	unsigned char incoming_buffer[MAX_INCOMING_BUF_SIZE] = "";
-	unsigned int bytes_received = 0;
-	int num_of_tokens = 0;
-
-	memset(incoming_buffer, '\0', MAX_INCOMING_BUF_SIZE);
-	bytes_received = SerialRecvCellular(incoming_buffer, MAX_INCOMING_BUF_SIZE, timeout_ms);
-	if (DEBUG) { printf("\n%s\n", incoming_buffer); }
-	if (bytes_received == 0) {
-		token_array[0] = NULL;
-		if (DEBUG) { printf("bytes = 0\n"); }
-		return false;
-	}
-
-	num_of_tokens = splitBufferToResponses(incoming_buffer, token_array, max_responses);
-
-	if (num_of_tokens > 0) {
-		if (memcmp(token_array[num_of_tokens-1], expected_response, response_size) == 0) {
-			if (DEBUG) { printf("token_array = %s\n", token_array[num_of_tokens - 1]); }
-			return true;
-		} else if ((memcmp(token_array[num_of_tokens-1], AT_RES_ERROR, 5) == 0) ||
-				   (memcmp(token_array[num_of_tokens-1], AT_RES_CME, 4) == 0)) {
-			if (DEBUG) { printf("token_array = %s\n", token_array[num_of_tokens - 1]); }
-			return false;
-		}
-	}
-
-	if (DEBUG) { printf("num of tokens %d\n", num_of_tokens); }
-	token_array[0] = NULL;
-	return false;
 }
 
 
 int getSISURCs(unsigned char ** token_array, int max_urcs, unsigned int timeout_ms) {
     unsigned char incoming_buffer[MAX_INCOMING_BUF_SIZE] = "";
-
     int num_of_tokens = 0;
 
 	memset(incoming_buffer, '\0', MAX_INCOMING_BUF_SIZE);
@@ -524,7 +371,6 @@ int getSISURCs(unsigned char ** token_array, int max_urcs, unsigned int timeout_
 	if (bytes_received != 0) {
 		num_of_tokens = splitBufferToResponses(incoming_buffer, token_array, max_urcs);
 	}
-
     return num_of_tokens;
 }
 
@@ -538,7 +384,7 @@ int getSISURCs(unsigned char ** token_array, int max_urcs, unsigned int timeout_
  */
 bool parseSISresponse(char * sis_result, int * urcCause, int * urcInfoId) {
     // ^SIS: <srvProfileId>, <urcCause>[, [<urcInfoId>][, <urcInfoText>]]
-    char * temp_token = strtok(sis_result, ",");   //<srvProfileId>,
+	char * temp_token = strtok(sis_result, ",");   //<srvProfileId>,
     temp_token = strtok(NULL, ",");         //<urcCause>
     *urcCause = atoi(temp_token);
     temp_token = strtok(NULL, ",");         //<urcInfoId>
@@ -547,7 +393,7 @@ bool parseSISresponse(char * sis_result, int * urcCause, int * urcInfoId) {
     if (*urcCause == 0) {
     	if (*urcInfoId == 200) {
     		temp_token = strtok(NULL, ",");         //<urcInfoText>>
-    		return (strcmp(temp_token, "HTTP-CODE: 204") == 0);
+    		return (strcmp(temp_token, "\"HTTP-CODE: 204\"") == 0);
 
     	} else if ((1 <= *urcInfoId) && (*urcInfoId <= 2000)) {
     		return false;
@@ -576,15 +422,16 @@ int parseSISRWresponse(char * sisrw_result) {
  * @return false if SIS URC reflecting error, true otherwise
  */
 bool parseSISURCs(unsigned char ** token_array, int received_urcs, char * urc_read_buffer) {
-//    const char urc_delimiter[] = ": ";
     for (int urc_idx = 0; urc_idx < received_urcs; urc_idx++) {
         char urc_prefix[100] = "";
         char urc_result[100] = "";
 
         if (strcmp(token_array[urc_idx], "ERROR") == 0) {
             return false;
+
         } else if (strcmp(token_array[urc_idx], "OK") == 0) {
 			continue;
+
         } else if (strncmp(token_array[urc_idx], "^SIS: ", 6) == 0) {
         	strncpy(urc_prefix, token_array[urc_idx], 4);
         	strncpy(urc_result, &(token_array[urc_idx])[6], 100);
@@ -609,14 +456,12 @@ bool parseSISURCs(unsigned char ** token_array, int received_urcs, char * urc_re
  */
 bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
     // AT^SISS=<srvProfileId>, <srvParmTag>, <srvParmValue>
-
     // AT^SISS=6,"SrvType","Http"
     int cmd_size = sprintf(command_to_send_buffer, "%s%d,\"SrvType\",\"Http\"%s",
                            AT_CMD_SISS_WRITE_PRFX, HTTP_SRV_PROFILE_ID, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForSimpleResponse(AT_RES_OK)) { return false; }
-//    if (!waitForOK()) { return false; }
 
     // AT^SISS=6,"conId","<conProfileId>"
     cmd_size = sprintf(command_to_send_buffer, "%s%d,\"conId\",\"%d\"%s",
@@ -624,7 +469,6 @@ bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForSimpleResponse(AT_RES_OK)) { return false; }
-//    if (!waitForOK()) { return false; }
 
     // AT^SISS=6,"address","<url>"
     cmd_size = sprintf(command_to_send_buffer, "%s%d,\"address\",\"%s\"%s",
@@ -632,7 +476,6 @@ bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForSimpleResponse(AT_RES_OK)) { return false; }
-//    if (!waitForOK()) { return false; }
 
     // AT^SISS=6,"cmd","1"
     cmd_size = sprintf(command_to_send_buffer, "%s%d,\"cmd\",\"%d\"%s",
@@ -640,7 +483,6 @@ bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForSimpleResponse(AT_RES_OK)) { return false; }
-//    if (!waitForOK()) { return false; }
 
     // AT^SISS=6,"hcContLen","0"
     // If "hcContLen" = 0 then the data given in the "hcContent" string will be posted
@@ -650,7 +492,6 @@ bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
     if (!waitForSimpleResponse(AT_RES_OK)) { return false; }
-//    if (!waitForOK()) { return false; }
 
     //AT^SISS=6,"hcContent","HelloWorld!"
     cmd_size = sprintf(command_to_send_buffer, "%s%d,\"hcContent\",\"%s\"%s",
@@ -658,7 +499,6 @@ bool inetServiceSetupProfile(char *URL, char *payload, int payload_len) {
     // send command and check response OK/ERROR
    sendATcommand(command_to_send_buffer, cmd_size);
    return waitForSimpleResponse(AT_RES_OK);
-//   return waitForOK();
 }
 
 /**
@@ -671,7 +511,6 @@ bool serviceProfileOpen(int serviceID) {
     int cmd_size = sprintf(command_to_send_buffer, "%s%d%s", AT_CMD_SISO_WRITE_PRFX, serviceID, AT_CMD_SUFFIX);
     sendATcommand(command_to_send_buffer, cmd_size);
     bool result = waitForSimpleResponse(AT_RES_OK);
-//    bool result = waitForOK();
     if (DEBUG) {printf("~%s~\n", rxBufferCellular);}
     return result;
 }
@@ -688,7 +527,6 @@ bool serviceProfileClose(int serviceID) {
     sendATcommand(command_to_send_buffer, cmd_size);
 
     bool result = waitForSimpleResponse(AT_RES_OK);
-//    bool result = waitForOK();
 	return result;
 }
 
@@ -718,16 +556,13 @@ int splitCopsResponseToOpsTokens(unsigned char *cops_response, OPERATOR_INFO *op
     int found_ops = 0;
     operator_token = strtok(cops_response, op_start_delimiter);
 
-//    unsigned char * operators_tokens[max_ops];
     unsigned char * operators_tokens[MAX_ISRAEL_OPS];
 
-//    for (int i=0; i < max_ops; i++) {
     for (int i=0; i < MAX_ISRAEL_OPS; i++) {
         operators_tokens[i] = (unsigned char *) malloc(MAX_OP_TOKEN_SIZE);
     }
 
     while (operator_token != NULL) {
-//        if (op_index >= max_ops) {
     	if (found_ops >= MAX_ISRAEL_OPS) {
             // found max operators
             break;
@@ -737,11 +572,9 @@ int splitCopsResponseToOpsTokens(unsigned char *cops_response, OPERATOR_INFO *op
         strcpy(operators_tokens[found_ops], operator_token);
         operator_token = strtok(NULL, op_start_delimiter);
         found_ops++;
-//        op_index++;
     }
 
     int parsed_ops_index = 0;
-//    for (; op_index > 0; op_index--) {
     for (; op_index < found_ops; op_index++) {
         if (splitOpTokensToOPINFO(operators_tokens[op_index], &opList[parsed_ops_index], specific_operators)) {
             parsed_ops_index++;
@@ -749,13 +582,8 @@ int splitCopsResponseToOpsTokens(unsigned char *cops_response, OPERATOR_INFO *op
     	if (parsed_ops_index >= max_ops) {
     		break;
     	}
-//        if (splitOpTokensToOPINFO(operators_tokens[parsed_ops_index], &opList[parsed_ops_index], specific_operators)) {
-//            parsed_ops_index++;
-//        }
-
     }
 
-//    for (int i=0; i < max_ops; i++) {
     for (int i=0; i < MAX_ISRAEL_OPS; i++) {
 		free(operators_tokens[i]);
 	}
@@ -818,7 +646,6 @@ bool CellularSetupInternetConnectionProfile(int inact_time_sec) {
         int cmd_size = sprintf(command_to_send_buffer, "%s%d,conType,GPRS0%s", AT_CMD_SICS_WRITE_PRFX, conProfileId_cand, AT_CMD_SUFFIX);
         sendATcommand(command_to_send_buffer, cmd_size);
 
-//        if (!waitForOK()) {
         if (!waitForSimpleResponse(AT_RES_OK)) {
             continue;
         }
@@ -831,7 +658,6 @@ bool CellularSetupInternetConnectionProfile(int inact_time_sec) {
         sendATcommand(command_to_send_buffer, cmd_size);
 
         if (!waitForSimpleResponse(AT_RES_OK)) {
-//        if (!waitForOK()) {
             continue;
         }
 
@@ -842,7 +668,6 @@ bool CellularSetupInternetConnectionProfile(int inact_time_sec) {
                            AT_CMD_SICS_WRITE_PRFX, conProfileId_cand, AT_CMD_SUFFIX);
         sendATcommand(command_to_send_buffer, cmd_size);
 
-//        if (waitForOK()) {
         if (waitForSimpleResponse(AT_RES_OK)) {
             conProfileId = conProfileId_cand;
             printf("success\n");
@@ -884,34 +709,27 @@ int CellularSendHTTPPOSTRequest(char *URL, char *payload, int payload_len, char 
     // ^SIS: 6,0,200,"HTTP-CODE: 204"
     int urcidx = 0;
     while (urcidx < 2) {
-    	if (getResponse(response, MAX_INCOMING_BUF_SIZE, GENERAL_RECV_TIMEOUT_MS)) {
+    	if (getResponse(response, response_max_len, GENERAL_RECV_TIMEOUT_MS)) {
+    		if (strlen(response) > 0) {
     		urcidx++;
-			if (strcmp(response, AT_RES_ERROR) == 0) {
-				return -1;
-			}
-			int urcCause, urcInfoId;
-			if (!parseSISresponse(response[6], &urcCause, &urcInfoId)) {
-				return -1;
-			}
+    		} else {
+				if (strcmp(response, AT_RES_ERROR) == 0) {
+					return -1;
+				}
+				int urcCause, urcInfoId;
+				char temp_sis[MAX_INCOMING_BUF_SIZE];
+				strcpy(temp_sis, response);
+				if (parseSISresponse(response[6], &urcCause, &urcInfoId)) {
+					char * last_delim = strrchr(temp_sis, ',');
+					strcpy(response, temp_sis);
+				} else {
+					return -1;
+				}
+    		}
     	}
     }
-
-
-
-
-//    char * urc_read_buff = "";
-//	unsigned char * tokens_array[5] = {};
-//	int received_urcs = getSISURCs(tokens_array, 5, SIS_RECV_TIMEOUT_MS);
-//	if (!parseSISURCs(tokens_array, received_urcs, urc_read_buff)) {
-//		return -1;
-//	}
-
-//    if (!serviceProfileClose(HTTP_SRV_PROFILE_ID)) {
-//        return -1;
-//    }
-
     // all went fine
-    return true;
+    return strlen(response);
 }
 
 
@@ -972,33 +790,6 @@ int CellularGetICCID(char * iccid) {
 		return strlen(iccid);
 	}
 	return 0;
-
-
-//    unsigned char * tokens_array[5] = {};
-//    do {
-//    	sendATcommand(command_to_send_buffer, cmd_size);
-//    } while (!waitForATresponse(tokens_array, AT_RES_OK, sizeof(AT_RES_OK) - 1, 5, GENERAL_RECV_TIMEOUT_MS));
-//
-//
-//
-//	// +CCID: <ICCID> or OK or ERROR
-//	const char urc_delimiter[] = ": ";
-//	for (int urc_idx = 0; urc_idx < 5; urc_idx++) {
-//		if (strlen(tokens_array[urc_idx]) == 0) {
-//			continue;
-//		}
-//		if (strcmp(tokens_array[urc_idx], "ERROR") == 0) {
-//			return 0;
-//		} else if (*tokens_array[urc_idx] == '+') {
-//			char * temp_token = "";
-//			temp_token = strtok(tokens_array[urc_idx], urc_delimiter);
-//			temp_token = strtok(NULL, urc_delimiter);
-//			int token_str_len = strlen(temp_token);
-//			strncpy(iccid, temp_token, token_str_len + 1);
-//			return token_str_len;
-//		}
-//	}
-//	return 0;
 }
 
 
@@ -1112,23 +903,6 @@ bool CellularPing(char * ip_address, int * mean_rtt) {
     	}
     }
     return false;
-
-//    unsigned char * tokens_array[40] = {};
-//    if (!waitForATresponse(tokens_array, AT_RES_OK, sizeof(AT_RES_OK) - 1, 40, GENERAL_RECV_TIMEOUT_MS+(num_packets*packet_timeout_ms))) {
-//        // error
-//        return false;
-//    }
-//    // response OK
-//    for (int idx = 39; idx >= 0; idx--) {
-//        if (strncmp(tokens_array[idx], "^SISX: \"Ping\", 3", strlen("^SISX: \"Ping\", 3")) == 0) {
-//            // ^SISX:"Ping", 3, <conProfileId>, <minRTT>, <maxRTT>, <meanRTT>
-//            char * mean_rtt_res = (tokens_array[idx], ',');
-//            *mean_rtt = atoi(mean_rtt_res);
-//            return true;
-//        }
-//    }
-//    return false;
-
 }
 
 
@@ -1139,13 +913,11 @@ bool CellularPing(char * ip_address, int * mean_rtt) {
  */
 bool socketServiceSetupProfile(char * remote_addr) {
     // AT^SISS=<srvProfileId>, <srvParmTag>, <srvParmValue>
-
     // AT^SISS=9,"SrvType","Socket"
     int cmd_size = sprintf(command_to_send_buffer, "%s%d,\"SrvType\",\"Socket\"%s",
                            AT_CMD_SISS_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
-//    if (!waitForOK()) { return false; }
     if (!waitForSimpleResponse(AT_RES_OK)) { return false; }
 
     // AT^SISS=9,"conId","<conProfileId>"
@@ -1153,7 +925,6 @@ bool socketServiceSetupProfile(char * remote_addr) {
                        AT_CMD_SISS_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, conProfileId, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
-//    if (!waitForOK()) { return false; }
     if (!waitForSimpleResponse(AT_RES_OK)) { return false; }
 
     // AT^SISS=9,"address","socktcp://95.179.243.207:54321"
@@ -1161,7 +932,6 @@ bool socketServiceSetupProfile(char * remote_addr) {
                        AT_CMD_SISS_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, remote_addr, AT_CMD_SUFFIX);
     // send command and check response OK/ERROR
     sendATcommand(command_to_send_buffer, cmd_size);
-//    return waitForOK();
     return waitForSimpleResponse(AT_RES_OK);
 }
 
@@ -1171,12 +941,12 @@ bool socketServiceSetupProfile(char * remote_addr) {
  * @return <urcCauseId>
  */
 int handleSISWURC() {
-	if (DEBUG) {printf("~%s~\n", rxBufferCellular);}
     unsigned char * tokens_array[1] = {};
     int received_urcs = getSISURCs(tokens_array, 1, SIS_SPEED_TIMEOUT_MS);
-    if (DEBUG) {printf("~%s~\n", rxBufferCellular);}
+
     if (received_urcs != 1) {
         return -1;
+
     } else if (strcmp(tokens_array[0], "^SISW: 9,1") == 0) {
         return 1;
 
@@ -1196,41 +966,30 @@ int handleSISWURC() {
 int handleSISWresponse() {
 	int cnfWriteLength = -1;
 	int unackData = -1;
+
 	unsigned char response[MAX_INCOMING_BUF_SIZE] = "";
 	if (getResponse(response, MAX_INCOMING_BUF_SIZE, SIS_SPEED_TIMEOUT_MS)) {
 		// ^SISW: <srvProfileId>, <cnfWriteLength>, <unackData>
 		if (strcmp(response, AT_RES_ERROR) == 0){
 			return cnfWriteLength;
+
 		}
 		if (strlen(response) == 0){
 			return cnfWriteLength;
+
 		}
 		char * first_delim = strchr(response, ',');
 		char * last_delim = strrchr(response, ',');
 		if (first_delim == last_delim) {
 			cnfWriteLength = atoi(first_delim + 1);
+
 		} else {
 			unackData = atoi(last_delim + 1);
 			*last_delim = '\0';
 			cnfWriteLength = atoi(first_delim + 1);
 		}
-//		cnfWriteLength = atoi(&cnf + 1);
 	}
 	return cnfWriteLength;
-
-//    unsigned char * tokens_array[1] = {};
-//    int received_urcs = getSISURCs(tokens_array, 1, SIS_SPEED_TIMEOUT_MS);
-//
-//    // ^SISW: <srvProfileId>, <cnfWriteLength>, <unackData>
-//    if (received_urcs != 1) {
-//        return -1;
-//    } else if (strcmp(tokens_array[0], "ERROR") == 0){
-//    	return -1;
-//    } else {
-//        char * last_delim = strrchr(&(tokens_array[0][9]), ',');
-//        *last_delim = '\0';
-//        return atoi(&(tokens_array[0][9]));
-//    }
 }
 
 
@@ -1244,6 +1003,7 @@ int handleSISRURC() {
 
     if (received_urcs != 1) {
         return -1;
+
     } else if (strcmp(tokens_array[0], "^SISR: 9,1") == 0) {
         return 1;
 
@@ -1264,8 +1024,9 @@ int handleSISRresponse() {
 	unsigned int cnfReadLength = -1;
 	unsigned char response[MAX_INCOMING_BUF_SIZE] = "";
 	if (getResponse(response, MAX_INCOMING_BUF_SIZE, SIS_SPEED_TIMEOUT_MS)) {
+
 		// ^SISR: <srvProfileId>, <cnfReadLength>
-		if (strcmp(response, AT_RES_ERROR) == 0){
+		if (strcmp(response, AT_RES_ERROR) == 0) {
 			return cnfReadLength;
 		}
 		if (strlen(response) == 0) {
@@ -1281,20 +1042,6 @@ int handleSISRresponse() {
 		}
 	}
 	return cnfReadLength;
-
-//    unsigned char * tokens_array[5] = {};
-//    int received_urcs = getSISURCs(tokens_array, 3, SIS_SPEED_TIMEOUT_MS);
-//
-//    // ^SISR: <srvProfileId>, <cnfReadLength>
-//    if (received_urcs != 3) {
-//        return -1;
-//
-//    } else {
-//        if (!(strcmp(tokens_array[2], "OK") == 0)) {
-//            return -1;
-//        }
-//        return atoi(&(tokens_array[0][9]));
-//    }
 }
 
 
@@ -1323,12 +1070,10 @@ void sendSpeedPacket() {
         while(!SerialSendCellular(AT_CMD_SUFFIX, 2));
 
         //OK or ERROR
-//        if (waitForOK()) {
         if (waitForSimpleResponse(AT_RES_OK)) {
             sent = sent + cnfWriteLength;
             if (sent <= ANALYZER_PACKET_SIZE) {
             	while (!waitForSimpleResponse("^SISW: 9,1"));
-//            while(handleSISWURC() == -1);
             }
         }
     }
