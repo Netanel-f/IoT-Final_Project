@@ -45,7 +45,8 @@ typedef struct __OPERATOR_INFO {
 //<srvProfileId> is needed to select a specific service profile.
 #define HTTP_SRV_PROFILE_ID 6
 #define SOCKET_SRV_PROFILE_ID 9
-#define ANALYZER_TOTAL_PACKETS 100
+#define ANALYZER_TOTAL_PACKETS 10
+//#define ANALYZER_TOTAL_PACKETS 100
 #define ANALYZER_PACKET_SIZE 1500
 
 /**************************************************************************//**

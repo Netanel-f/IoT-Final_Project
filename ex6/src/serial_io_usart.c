@@ -134,7 +134,7 @@ unsigned int SerialRecvCellular(unsigned char *buf, unsigned int maxlen, unsigne
 //			}
 //		}
 	}
-//	if (i && DEBUG) { printf("~%s~\n", buf); }
+	if (i && DEBUG) { printf("serecv: %s serecvEND\n", buf); }
 	return i;
 }
 

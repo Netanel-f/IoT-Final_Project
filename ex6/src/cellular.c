@@ -306,7 +306,8 @@ bool CellularSetOperator(int mode, char *operatorName, int act){
  * @param maxops - The array contains a total of maxops items.
  * @param numOpsFound - numOpsFound is allocated by the caller and will contain the number
  * of operators found and populated into the opList.
- * @return Returns false if an error occurred or no operators found.
+ * @return Returns false if an error
+red or no operators found.
  * Returns true and populates opList and opsFound if the command succeeded.
  */
 bool CellularGetOperators(OPERATOR_INFO *opList, int maxops, int *numOpsFound){
@@ -444,7 +445,7 @@ bool waitForSimpleResponse(unsigned char * expected_response) {
 bool getResponse(unsigned char * response_buffer, unsigned int buf_len, unsigned int timeout_ms) {
 	memset(response_buffer, '\0', buf_len);
 	unsigned int bytes_received = SerialRecvCellular(response_buffer, buf_len, timeout_ms);
-	if (DEBUG) { printf("\n%s\n", response_buffer); }
+//	if (DEBUG) { printf("\n%s\n", response_buffer); }
 	return bytes_received;
 }
 /**
@@ -881,16 +882,33 @@ int CellularSendHTTPPOSTRequest(char *URL, char *payload, int payload_len, char 
     // need to handle ^SIS URCs
     // ^SIS: 6,0,2200,"Http 51.143.141.28:8086"
     // ^SIS: 6,0,200,"HTTP-CODE: 204"
-    char * urc_read_buff = "";
-	unsigned char * tokens_array[5] = {};
-	int received_urcs = getSISURCs(tokens_array, 5, SIS_RECV_TIMEOUT_MS);
-	if (!parseSISURCs(tokens_array, received_urcs, urc_read_buff)) {
-		return -1;
-	}
-
-    if (!serviceProfileClose(HTTP_SRV_PROFILE_ID)) {
-        return -1;
+    int urcidx = 0;
+    while (urcidx < 2) {
+    	if (getResponse(response, MAX_INCOMING_BUF_SIZE, GENERAL_RECV_TIMEOUT_MS)) {
+    		urcidx++;
+			if (strcmp(response, AT_RES_ERROR) == 0) {
+				return -1;
+			}
+			int urcCause, urcInfoId;
+			if (!parseSISresponse(response[6], &urcCause, &urcInfoId)) {
+				return -1;
+			}
+    	}
     }
+
+
+
+
+//    char * urc_read_buff = "";
+//	unsigned char * tokens_array[5] = {};
+//	int received_urcs = getSISURCs(tokens_array, 5, SIS_RECV_TIMEOUT_MS);
+//	if (!parseSISURCs(tokens_array, received_urcs, urc_read_buff)) {
+//		return -1;
+//	}
+
+//    if (!serviceProfileClose(HTTP_SRV_PROFILE_ID)) {
+//        return -1;
+//    }
 
     // all went fine
     return true;
@@ -1063,7 +1081,7 @@ bool CellularPing(char * ip_address, int * mean_rtt) {
     int num_packets = 30; // 1-30
     int max_responses = num_packets + 5;
     unsigned int packet_timeout_ms = 1000;
-    int cmd_size = sprintf(command_to_send_buffer, "%sPing,%d,%s,%d,%d", AT_CMD_SISX_WRITE_PRFX, conProfileId, ip_address, num_packets, packet_timeout_ms);
+    int cmd_size = sprintf(command_to_send_buffer, "%sPing,%d,%s,%d,%d%s", AT_CMD_SISX_WRITE_PRFX, conProfileId, ip_address, num_packets, packet_timeout_ms, AT_CMD_SUFFIX);
     sendATcommand(command_to_send_buffer, cmd_size);
 
     unsigned char response[MAX_INCOMING_BUF_SIZE] = "";
@@ -1072,13 +1090,21 @@ bool CellularPing(char * ip_address, int * mean_rtt) {
     //			 1 * ^SISX:"Ping", 2, <conProfileId>, <sent>, <received>, <lost>, <lostPercent>
     //			 1 * ^SISX:"Ping", 3, <conProfileId>, <minRTT>, <maxRTT>, <meanRTT>
     for (int i=0; i < num_packets +3; i++) {
-    	 result = getResponse(response, MAX_INCOMING_BUF_SIZE, GENERAL_RECV_TIMEOUT_MS);
+    	result = getResponse(response, MAX_INCOMING_BUF_SIZE, packet_timeout_ms+50);
+    	if (!result) {
+    		continue;
+    	}
+    	if (i <= num_packets + 1) {
+    		if (strncmp(response, "^SISX", 5) != 0) {
+    			return false;
+    		}
+    	}
     	if (strcmp(response, AT_RES_ERROR) == 0) {
     		return false;
     	} else if (i == num_packets + 1) {
     		//^SISX:"Ping",3, <conProfileId>, <minRTT>, <maxRTT>, <meanRTT>
     		char * mean_rtt_str = strrchr(response, ',');
-    		*mean_rtt = atoi(&mean_rtt_str + 1);
+    		*mean_rtt = atoi(mean_rtt_str + 1);
     	} else if (i == num_packets + 2) {
     		if (strcmp(response, AT_RES_OK) == 0) {
     			return true;
@@ -1168,19 +1194,43 @@ int handleSISWURC() {
  * @return <cnfWriteLength>
  */
 int handleSISWresponse() {
-    unsigned char * tokens_array[1] = {};
-    int received_urcs = getSISURCs(tokens_array, 1, SIS_SPEED_TIMEOUT_MS);
+	int cnfWriteLength = -1;
+	int unackData = -1;
+	unsigned char response[MAX_INCOMING_BUF_SIZE] = "";
+	if (getResponse(response, MAX_INCOMING_BUF_SIZE, SIS_SPEED_TIMEOUT_MS)) {
+		// ^SISW: <srvProfileId>, <cnfWriteLength>, <unackData>
+		if (strcmp(response, AT_RES_ERROR) == 0){
+			return cnfWriteLength;
+		}
+		if (strlen(response) == 0){
+			return cnfWriteLength;
+		}
+		char * first_delim = strchr(response, ',');
+		char * last_delim = strrchr(response, ',');
+		if (first_delim == last_delim) {
+			cnfWriteLength = atoi(first_delim + 1);
+		} else {
+			unackData = atoi(last_delim + 1);
+			*last_delim = '\0';
+			cnfWriteLength = atoi(first_delim + 1);
+		}
+//		cnfWriteLength = atoi(&cnf + 1);
+	}
+	return cnfWriteLength;
 
-    // ^SISW: <srvProfileId>, <cnfWriteLength>, <unackData>
-    if (received_urcs != 1) {
-        return -1;
-    } else if (strcmp(tokens_array[0], "ERROR") == 0){
-    	return -1;
-    } else {
-        char * last_delim = strrchr(&(tokens_array[0][9]), ',');
-        *last_delim = '\0';
-        return atoi(&(tokens_array[0][9]));
-    }
+//    unsigned char * tokens_array[1] = {};
+//    int received_urcs = getSISURCs(tokens_array, 1, SIS_SPEED_TIMEOUT_MS);
+//
+//    // ^SISW: <srvProfileId>, <cnfWriteLength>, <unackData>
+//    if (received_urcs != 1) {
+//        return -1;
+//    } else if (strcmp(tokens_array[0], "ERROR") == 0){
+//    	return -1;
+//    } else {
+//        char * last_delim = strrchr(&(tokens_array[0][9]), ',');
+//        *last_delim = '\0';
+//        return atoi(&(tokens_array[0][9]));
+//    }
 }
 
 
@@ -1211,19 +1261,40 @@ int handleSISRURC() {
  * @return <cnfReadLength>
  */
 int handleSISRresponse() {
-    unsigned char * tokens_array[5] = {};
-    int received_urcs = getSISURCs(tokens_array, 3, SIS_SPEED_TIMEOUT_MS);
+	unsigned int cnfReadLength = -1;
+	unsigned char response[MAX_INCOMING_BUF_SIZE] = "";
+	if (getResponse(response, MAX_INCOMING_BUF_SIZE, SIS_SPEED_TIMEOUT_MS)) {
+		// ^SISR: <srvProfileId>, <cnfReadLength>
+		if (strcmp(response, AT_RES_ERROR) == 0){
+			return cnfReadLength;
+		}
+		if (strlen(response) == 0) {
+			return cnfReadLength;
+		}
+		char * cnf = strchr(response, ',');
+		cnfReadLength = atoi(cnf + 1);
+		if (!getResponse(response, MAX_INCOMING_BUF_SIZE, SIS_SPEED_TIMEOUT_MS)) {
+			return -1;
+		}
+		if (!waitForSimpleResponse(AT_RES_OK)) {
+			return -1;
+		}
+	}
+	return cnfReadLength;
 
-    // ^SISR: <srvProfileId>, <cnfReadLength>
-    if (received_urcs != 3) {
-        return -1;
-
-    } else {
-        if (!(strcmp(tokens_array[2], "OK") == 0)) {
-            return -1;
-        }
-        return atoi(&(tokens_array[0][9]));
-    }
+//    unsigned char * tokens_array[5] = {};
+//    int received_urcs = getSISURCs(tokens_array, 3, SIS_SPEED_TIMEOUT_MS);
+//
+//    // ^SISR: <srvProfileId>, <cnfReadLength>
+//    if (received_urcs != 3) {
+//        return -1;
+//
+//    } else {
+//        if (!(strcmp(tokens_array[2], "OK") == 0)) {
+//            return -1;
+//        }
+//        return atoi(&(tokens_array[0][9]));
+//    }
 }
 
 
@@ -1234,6 +1305,7 @@ void sendSpeedPacket() {
     int cnfWriteLength;
     int sent = 0;
     while (sent < ANALYZER_PACKET_SIZE) {
+    	if (DEBUG) {printf("sent: %d", sent); }
         // AT^SISW=<srvProfileId>, <reqWriteLength>
         int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d%s",
                                AT_CMD_SISW_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, ANALYZER_PACKET_SIZE-sent, AT_CMD_SUFFIX);
@@ -1246,6 +1318,7 @@ void sendSpeedPacket() {
         }
 
         //Number of data bytes as specified by <cnfWriteLength>.
+
         while(!SerialSendCellular(&speed_packet[sent], cnfWriteLength));
         while(!SerialSendCellular(AT_CMD_SUFFIX, 2));
 
@@ -1253,7 +1326,10 @@ void sendSpeedPacket() {
 //        if (waitForOK()) {
         if (waitForSimpleResponse(AT_RES_OK)) {
             sent = sent + cnfWriteLength;
-            while(handleSISWURC() == -1);
+            if (sent <= ANALYZER_PACKET_SIZE) {
+            	while (!waitForSimpleResponse("^SISW: 9,1"));
+//            while(handleSISWURC() == -1);
+            }
         }
     }
 }
@@ -1264,12 +1340,12 @@ void sendSpeedPacket() {
  */
 void waitForULAck() {
     // AT^SISR=<srvProfileId>, <reqReadLength>//todo check reqReadLength
-    int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d\"%s",
-                           AT_CMD_SISR_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, ANALYZER_PACKET_SIZE, AT_CMD_SUFFIX);
+    int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d%s",
+                           AT_CMD_SISR_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, 15, AT_CMD_SUFFIX);
     // send command
     sendATcommand(command_to_send_buffer, cmd_size);
     //^SISR: <srvProfileId>, <cnfReadLength>
-    //Number of data bytes as specified by <cnfWriteLength>.
+    //Number of data bytes as specified by <cnfReadLength>.
     //OK or ERROR
     handleSISRresponse();
 }
@@ -1279,23 +1355,26 @@ void waitForULAck() {
  * This method will receive #ANALYZER_PACKET_SIZE Bytes over the TCP socket.
  */
 void receiveSpeedPacket() {
-    int cnfWriteLength;
+    int cnfReadLength;
     int recv = 0;
     while (recv < ANALYZER_PACKET_SIZE) {
         // AT^SISR=<srvProfileId>, <reqReadLength>
-        int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d\"%s",
+        int cmd_size = sprintf(command_to_send_buffer, "%s%d,%d%s",
                                AT_CMD_SISR_WRITE_PRFX, SOCKET_SRV_PROFILE_ID, ANALYZER_PACKET_SIZE-recv, AT_CMD_SUFFIX);
         // send command
         sendATcommand(command_to_send_buffer, cmd_size);
         //^SISR: <srvProfileId>, <cnfReadLength>
         //Number of data bytes as specified by <cnfWriteLength>.
         //OK or ERROR
-        cnfWriteLength = handleSISRresponse();
-        if (cnfWriteLength <= 0) {
+        cnfReadLength = handleSISRresponse();
+        if (cnfReadLength <= 0) {
             continue;
         }
-        recv = recv + cnfWriteLength;
-        while(handleSISRURC() == -1);
+        recv = recv + cnfReadLength;
+//        if (recv <= ANALYZER_PACKET_SIZE) {
+//        	while (!waitForSimpleResponse("^SISR: 9,1"));
+//        while(handleSISRURC() == -1);
+//        }
     }
 }
 /**

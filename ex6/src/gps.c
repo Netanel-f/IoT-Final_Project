@@ -32,6 +32,7 @@ void GPSInit(char * port) {
  * @return number of bytes received.
  *****************************************************************************/
 uint32_t GPSGetReadRaw(char *buf, unsigned int maxlen) {
+	memset(buf, '\0', maxlen);
     if (GPS_INITIALIZED) {
         return SerialRecvGPS((unsigned char*) buf, maxlen, RECV_TIMEOUT_MS);
     }
