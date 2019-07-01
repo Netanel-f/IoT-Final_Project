@@ -24,9 +24,9 @@
 void Delay(uint32_t dlyTicks);
 int getPreTestData();
 void testOperators();
-void testSpeed(long double * ul_Bps, long double * dl_Bps);
+bool testSpeed(long double * ul_Bps, long double * dl_Bps);
 void transmit_results(OPERATOR_INFO * current_op, float ul, float dl, int latency );
-void printTestResults(OPERATOR_INFO * operatorInfo, long double ul_bps, long double dl_bps, long double latency);
+void printTestResults(OPERATOR_INFO * operatorInfo, long double ul_bps, long double dl_bps, int latency);
 
 /****************************************************************************
  * 								DEFS
@@ -39,7 +39,7 @@ void printTestResults(OPERATOR_INFO * operatorInfo, long double ul_bps, long dou
 #define TRANSMIT_URL "http://51.143.141.28:8086/write?db=mydb"
 #define TRANS_RES_BUF_SIZE 100
 #define MAX_PAYLOAD_SIZE 255
-#define ANALYZER_FORMAT "iNetworkAnalyzer,ICCID=%s latitude=%f,longitude=%f,altitude=%d,opt_code=%d,opt_act=%s,opt_ul=%f,opt_dl=%f,opt_latency=%d"
+#define ANALYZER_FORMAT "iNA,ICCID=%s latitude=%f,longitude=%f,altitude=%d,opt_code=%d,opt_act=%c,opt_ul=%Lf,opt_dl=%Lf,opt_latency=%d"
 //todo
 #define BYTES_TO_BITS 8
 #define KILOBIT_IN_BITS 1000
@@ -238,9 +238,10 @@ int getPreTestData() {
 	memset(speed_results, '\0', MAX_PAYLOAD_SIZE);//todo check size
 
 	/* Get GPS data */
+	bool result = false;
 	do {
-		GPSGetFixInformation(current_location);
-	} while (current_location->valid_fix == 0);
+		result = GPSGetFixInformation(current_location);
+	} while (!result || current_location->valid_fix == 0);
 
 	/* clear found_operators struct */
 	for (int i=0; i < iNA_MAX_CANDIDATE_CELL_OPS; i++) {
@@ -327,17 +328,18 @@ void testOperators() {
                     long double ul_bps, dl_bps, latency;
                     int mean_rtt;
                     /* measure internet performance */
-                    testSpeed(&ul_bps, &dl_bps);
-                    CellularPing(SPEEDTEST_PING_ADDR, &mean_rtt);
+                    bool speed_res = testSpeed(&ul_bps, &dl_bps);
+                    bool ping_res = CellularPing(SPEEDTEST_PING_ADDR, &mean_rtt);
                     latency = mean_rtt / 2.0;
 
-                    /* transmit result to remote DB */
-					transmit_results(&found_operators[op_index], ul_bps, dl_bps, latency);
+                    if (speed_res && ping_res) {
+						/* transmit result to remote DB */
+						transmit_results(&found_operators[op_index], ul_bps, dl_bps, latency);
 
-					/* print result to screen */
-                    printTestResults(&found_operators[op_index], ul_bps, dl_bps, latency);
-
-
+						/* print result to screen */
+						printTestResults(&found_operators[op_index], ul_bps, dl_bps, latency);
+                    }
+					continue;
 				} else {
 					printf("Couldn't get signal quality.\n");
 				}
@@ -353,7 +355,7 @@ void testOperators() {
  * @param ul_bps long double pointer to save upload bitrate to
  * @param dl_bps long double pointer to save download bitrate to
  */
-void testSpeed(long double * ul_bps, long double * dl_bps) {
+bool testSpeed(long double * ul_bps, long double * dl_bps) {
     int scnt = 0;
     int rcnt = 0;
     uint32_t ul_start, ul_end, dl_start, dl_end;
@@ -365,44 +367,52 @@ void testSpeed(long double * ul_bps, long double * dl_bps) {
         printf("Failed to open Socket service");
         /* Close socket service profile */
 		while (!serviceProfileClose(SOCKET_SRV_PROFILE_ID));
-        return;
+        return false;
     }
 
     // handle ^SISW: 9,1
-    if (handleSISWURC() != 1) {
+    if (!waitForSimpleResponse("^SISW: 9,1")) {
+//    if (handleSISWURC() != 1) {
         printf("handle ^SISW failed");
-        return;
+        return false;
     }
     ul_start = msTicks;
     while (scnt < ANALYZER_TOTAL_PACKETS) {
+    	if (DEBUG) {printf("#packets sent: %d\n", scnt); }
         sendSpeedPacket();
         scnt++;
     }
+    if (DEBUG) {printf("#packets sent: %d\n", scnt); }
     // handle ^SISR: 9,1 - wait for ack packet
-    int temp_result = handleSISRURC();
+    bool temp_result = waitForSimpleResponse("^SISR: 9,1");
+//    int temp_result = handleSISRURC();
     ul_end = msTicks;
 
-    if (temp_result != 1) {
+    if (!temp_result) {
+//    if (temp_result != 1) {
         printf("handle ^SISR failed");
-        return;
+        return false;
     }
     waitForULAck();
 
     dl_start = msTicks;
     while (rcnt < ANALYZER_TOTAL_PACKETS) {
+    	if (DEBUG) {printf("#packets received: %d\n", rcnt); }
         receiveSpeedPacket();
         rcnt++;
     }
+    if (DEBUG) {printf("#packets received: %d\n", rcnt); }
     dl_end = msTicks;
 
-    *ul_bps = BYTES_TO_BITS * (ANALYZER_TOTAL_PACKETS * ANALYZER_PACKET_SIZE / ((ul_end - ul_start)*1000000));
-    *dl_bps = BYTES_TO_BITS * (ANALYZER_TOTAL_PACKETS * ANALYZER_PACKET_SIZE / ((dl_end - dl_start)*1000000));
+    *ul_bps = BYTES_TO_BITS * (ANALYZER_TOTAL_PACKETS * ANALYZER_PACKET_SIZE / ((ul_end - ul_start)/1000));
+    *dl_bps = BYTES_TO_BITS * (ANALYZER_TOTAL_PACKETS * ANALYZER_PACKET_SIZE / ((dl_end - dl_start)/1000));
 
     /* Close socket service profile */
     if (!serviceProfileClose(SOCKET_SRV_PROFILE_ID)) {
         printf("Failed to close Socket service");
-        return;
+        return false;
     }
+    return true;
 }
 
 
@@ -422,9 +432,9 @@ void transmit_results(OPERATOR_INFO * current_op, float ul, float dl, int latenc
 	float lat_deg = (current_location->latitude) / 10000000.0;
 	float long_deg = (current_location->longitude) / 10000000.0;
 
-	//FORMAT "networkAnalyzer,ICCID=%s latitude=%f,longitude=%f,altitude=%d,opt_code=%d,opt_act=%s,opt_ul=%f,opt_dl=%f,opt_latency=%d "
+	//FORMAT "iNA,ICCID=%s latitude=%f,longitude=%f,altitude=%d,opt_code=%d,opt_act=%c,opt_ul=%f,opt_dl=%f,opt_latency=%d"
 	int	payload_len = sprintf(payload_buffer, ANALYZER_FORMAT,
-								  iccid, lat_deg, long_deg, current_location->altitude, current_op->operatorCode, (current_op->accessTechnology)[0], ul, dl, latency);
+								  iccid, lat_deg, long_deg, current_location->altitude, current_op->operatorCode, current_op->accessTechnology[0], ul, dl, latency);
     // transmit GPS data over HTTP
     if (CellularSendHTTPPOSTRequest(TRANSMIT_URL, payload_buffer, payload_len, transmit_response, TRANS_RES_BUF_SIZE) == -1) {
         printf("Failed\n");
@@ -442,7 +452,7 @@ void transmit_results(OPERATOR_INFO * current_op, float ul, float dl, int latenc
  * @param dl_bps download bitrate bits per seconds
  * @param latency ping latency ms
  */
-void printTestResults(OPERATOR_INFO * operatorInfo, long double ul_bps, long double dl_bps, long double latency) {
+void printTestResults(OPERATOR_INFO * operatorInfo, long double ul_bps, long double dl_bps, int latency) {
     char * ul_unit;
     char * dl_unit;
     if (ul_bps >= MEGABIT_IN_BITS) {
@@ -470,7 +480,8 @@ void printTestResults(OPERATOR_INFO * operatorInfo, long double ul_bps, long dou
     //  Latency: ddd ms
     //  UL: ddd Xbps
     //  DL: ddd Xbps
-    printf(speed_results, " %s - %s\n Latency: %.1f ms\n DL: %.2f %s\n UL: %.2f %s\n",
+    printf("\f");
+    printf(speed_results, " %s - %s\n Latency: %d ms\n DL: %.2Lf %s\n UL: %.2Lf %s\n",
            operatorInfo->operatorName, operatorInfo->accessTechnology,
            latency, dl_bps, dl_unit, ul_bps, ul_unit);
 
