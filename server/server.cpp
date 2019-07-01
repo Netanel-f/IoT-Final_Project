@@ -20,10 +20,9 @@ using namespace std::chrono;
 #define MAX_PACKET_SIZE_BYTES 1048576
 
 #define ANALYZER_TOTAL_PACKETS 10
-//#define ANALYZER_TOTAL_PACKETS 100
 #define ANALYZER_PACKET_SIZE 1500
 
-#define DEBUG true
+#define DEBUG false
 
 class Server {
     int welcome_socket;
@@ -178,7 +177,7 @@ void Server::downloadTest(int client_fd) {
 
     while (this->scnt < ANALYZER_TOTAL_PACKETS) {
         bytes_sent = 0;
-        if (DEBUG) { printf("#packets sent: %d\n", this->scnt); }
+        printf("#packets sent: %d\n", this->scnt);
 
         while (bytes_sent < ANALYZER_PACKET_SIZE) {
             ret_value = send(client_fd, this->read_buffer, ANALYZER_PACKET_SIZE, 0);
@@ -187,17 +186,19 @@ void Server::downloadTest(int client_fd) {
         }
         this->scnt++;
     }
-    if (DEBUG) { printf("#packets sent: %d\n", this->scnt); }
+    printf("#packets sent: %d\n", this->scnt);
     if (DEBUG) { printf("DOWNLOAD TEST FINISHED\n"); }
 
     // close client socket
     FD_CLR(client_fd, &this->clients_fds);
 
-    ret_value = shutdown(client_fd, SHUT_RDWR);
-    if (ret_value < 0) { print_error("shutdown() failed.", errno); }
+//    ret_value = shutdown(client_fd, SHUT_RDWR);
+//    if (ret_value < 0) { print_error("shutdown() failed.", errno); }
+//    ret_value = close(client_fd);
+//    if (ret_value < 0) { print_error("close() failed.", errno); }
 
-    ret_value = close(client_fd);
-    if (ret_value < 0) { print_error("close() failed.", errno); }
+    this->scnt = 0;
+    this->rcnt = 0;
 
     this->clients_sockets.erase(std::to_string(client_fd));
     if (DEBUG) { printf("**erasing %d\n", client_fd); }
@@ -227,17 +228,19 @@ void Server::uploadTest(int client_fd) {
     }
 
     this->rcnt++;
-    if (DEBUG) { printf("#packets received %d\n", this->rcnt); }
+   printf("#packets received %d\n", this->rcnt);
 
     if (this->rcnt >= ANALYZER_TOTAL_PACKETS) {
         if (DEBUG) { printf("UPLOAD FINISHED\n"); }
 
-        ret_value = send(client_fd, "UPLOAD_FINISHED\r\n", 15, 0);
+        ret_value = send(client_fd, "UPLOAD_FINISHED", 15, 0);
         if (ret_value < 0) { print_error("send() failed", errno); }
         memset(this->read_buffer, '\0', ret_value);
         return downloadTest(client_fd);
     }
 }
+
+
 ///**
 // * This method will echo to specific client fd
 // * @param client_fd client socket fd to echo.
