@@ -44,4 +44,4 @@ Server side:
 We have implemented a server side as C++ application.
 The server listening to welcome socket and accepting clients, and will manages the upload and download test accrodingly.
 
-![Grafna Panels](/grafana_screenshot.png)
+![Grafna Panels](https://github.com/Netanel-f/IoT-Final_Project/blob/master/grafana_screenshot.png)
