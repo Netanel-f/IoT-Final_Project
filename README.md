@@ -1,4 +1,4 @@
-# IOT_Final-Project iNetworkAnalyzer
+# IOT Final Project iNetworkAnalyzer
 
 iNetworkAnalyzer (a.k.a iNA) is a tool for taking basic internet performance measurements over cellular, such as latency, upload bitrate and  download bitrate.
 
@@ -44,4 +44,6 @@ Server side:
 We have implemented a server side as C++ application.
 The server listening to welcome socket and accepting clients, and will manages the upload and download test accrodingly.
 
+Grafana Monitoring panel:
+-------------------------
 ![Grafna-Panels](https://github.com/Netanel-f/IoT-Final_Project/blob/master/grafana_screenshot.png?raw=true)
